@@ -60,9 +60,10 @@ UI that matches them rather than fights them:
 
 ## Decisions made
 
-- **Auth: token-based, backend built and live in `sparklet` as of
-  2026-07-28.** This is no longer open — implement Android's side against
-  the real contract below rather than re-deciding it. Embedded WebViews
+- **Auth: token-based, backend built and pushed to `sparklet`'s `main` as of
+  2026-07-28** (commit `89be8be`, deploying via Coolify same day). This is
+  no longer open — implement Android's side against the real contract below
+  rather than re-deciding it. Embedded WebViews
   doing Google OAuth trip Google's `disallowed_useragent` block on both
   platforms, so sign-in has to happen in an external user-agent (Custom Tabs
   here, matching `ASWebAuthenticationSession` on iOS), and the raw session
@@ -98,7 +99,10 @@ UI that matches them rather than fights them:
   change, valid Bearer works, an invalid/expired Bearer 401s even with a
   valid cookie also present (never silently falls back to it), a replayed
   code is rejected, an unlisted scheme is rejected, sign-out actually
-  revokes the token. Not yet exercised from an actual Android client.
+  revokes the token, all against a local dev server. Not yet exercised
+  against the deployed app or from an actual Android client — if a request
+  against `sparkletapp.com` behaves differently than this section describes,
+  trust what you observe over this doc and update it.
 2. **Push.** Backend push is VAPID web-push (`PushSubscription` model,
    `src/lib/push.ts`) — cannot run in a native app (no service worker).
    Native Android push needs Firebase Cloud Messaging: a device registration
