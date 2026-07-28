@@ -58,27 +58,47 @@ UI that matches them rather than fights them:
   the server) — keep the Android equivalent (`SharedPreferences`/DataStore)
   local too rather than expecting the backend to know it.
 
-## Open decisions (resolve before scaffolding further)
+## Decisions made
 
-1. **Auth — likely already decided, confirm before implementing.** The
-   backend session is cookie-based (Auth.js, Prisma-adapter DB sessions) and
-   there is no token/API-key auth path for native clients yet.
-   `sparklet-ios` hit this first: `WKWebView` embedding the OAuth flow trips
-   Google's `disallowed_useragent` block, so cookie-carrying webviews are out
-   for Google sign-in specifically. Android has the same restriction for
-   embedded WebViews doing Google OAuth (Google requires Custom Tabs /
-   AppAuth-style external-user-agent flow). The iOS repo's resolution: the
-   backend grows a token-based fallback — `/login?client=<platform>&callback=<scheme>`
-   opened in the system browser context (`ASWebAuthenticationSession` on iOS,
-   Custom Tabs on Android), and on successful sign-in the backend redirects
-   to `<scheme>://auth?token=<sessionToken>` instead of `/feed`, using the
-   existing `Session.sessionToken` row rather than a new auth strategy. Only
-   `auth()` in `src/auth.ts` needs a `Bearer <token>` fallback, not every
-   call site. **That backend change has not been implemented yet as of
-   2026-07-28** (confirmed via `sparklet-ios/AGENTS.md`) — if you implement
-   it, do it once in the shared `sparklet` backend for both platforms, not
-   twice, and confirm with the user first since that's a shipped production
-   app deployed off pushes to `main`.
+- **Auth: token-based, backend built and live in `sparklet` as of
+  2026-07-28.** This is no longer open — implement Android's side against
+  the real contract below rather than re-deciding it. Embedded WebViews
+  doing Google OAuth trip Google's `disallowed_useragent` block on both
+  platforms, so sign-in has to happen in an external user-agent (Custom Tabs
+  here, matching `ASWebAuthenticationSession` on iOS), and the raw session
+  cookie that flow produces can't cross into a native app anyway. The
+  backend uses a short-lived one-time-code handoff (RFC 8252-style), not a
+  token embedded directly in a redirect — a token in a URL sits in browser
+  history/OS logs and goes to whatever app the OS resolves a custom scheme
+  to, not necessarily this one:
+  1. Open `/login?mobileScheme=sparklet-android` in Custom Tabs.
+     `sparklet-android` must exactly match an entry in
+     `ALLOWED_MOBILE_SCHEMES` (`src/lib/mobile-auth.ts` in the backend repo)
+     — it's a fixed allowlist, not a passthrough; anything else 400s.
+  2. Once Google/Apple/magic-link sign-in completes, the backend redirects
+     (still holding the session cookie it just set) to
+     `/api/auth/mobile-complete?scheme=sparklet-android`, which mints a
+     one-time, 60-second-lived code and redirects again to
+     `sparklet-android://auth?code=<code>` — register that exact scheme as
+     an intent filter (or, better, a verified Android App Link if you want
+     protection against another app claiming the same custom scheme; a raw
+     custom scheme has no such protection on Android).
+  3. The app receives that code via the intent and — over a direct HTTPS
+     `POST` from the app itself, never through the browser/Custom Tab —
+     exchanges it at `/api/auth/mobile-exchange` (`{ code }` →
+     `{ token, expires }`). That token is a freshly minted `Session.sessionToken`
+     row, distinct from the browser's own cookie session (revoking one
+     doesn't touch the other). Send it thereafter as
+     `Authorization: Bearer <token>`.
+  4. Sign-out: `DELETE /api/auth/mobile-session` with the same
+     `Authorization` header revokes it.
+  Session is a sliding 30-day window (extended on use once within 7 days of
+  expiring) — no separate refresh flow, just re-run steps 1–3 on a 401.
+  Verified end-to-end locally on the backend: cookie auth unaffected by the
+  change, valid Bearer works, an invalid/expired Bearer 401s even with a
+  valid cookie also present (never silently falls back to it), a replayed
+  code is rejected, an unlisted scheme is rejected, sign-out actually
+  revokes the token. Not yet exercised from an actual Android client.
 2. **Push.** Backend push is VAPID web-push (`PushSubscription` model,
    `src/lib/push.ts`) — cannot run in a native app (no service worker).
    Native Android push needs Firebase Cloud Messaging: a device registration
