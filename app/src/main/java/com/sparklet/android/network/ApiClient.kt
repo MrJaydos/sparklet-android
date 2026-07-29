@@ -63,9 +63,18 @@ object ApiClient {
 
     // Kept non-generic and non-inline (unlike get/post) so the actual
     // network call and status handling exist exactly once.
-    suspend fun execute(request: Request): String {
+    //
+    // The whole thing — not just newCall().execute() — has to run inside
+    // withContext(Dispatchers.IO): response.body.string() below does its own
+    // blocking socket read for a chunked response (no Content-Length to
+    // pre-buffer against), so calling it from whatever dispatcher invoked
+    // execute() risks NetworkOnMainThreadException. This only showed up once
+    // a response was large enough to need a read past OkHttp's initial
+    // buffered chunk — small responses (e.g. /api/profile) happened to be
+    // fully readable from that buffer and never touched the socket here.
+    suspend fun execute(request: Request): String = withContext(Dispatchers.IO) {
         val response = try {
-            withContext(Dispatchers.IO) { client.newCall(request).execute() }
+            client.newCall(request).execute()
         } catch (e: IOException) {
             throw ApiException.Transport(e)
         }
@@ -73,7 +82,7 @@ object ApiClient {
             val bodyString = it.body?.string().orEmpty()
             if (it.code == 401) throw ApiException.Unauthorized
             if (!it.isSuccessful) throw ApiException.Server(it.code, bodyString)
-            return bodyString
+            return@withContext bodyString
         }
     }
 
