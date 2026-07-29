@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Local dev only: 10.0.2.2 is the Android emulator's alias for the host
+machine (see AGENTS.md's Commands section), and the local `sparklet` Next.js
+dev server there is plain HTTP. Cleartext is scoped to that one address —
+production (sparkletapp.com) still goes through the default HTTPS-only
+config. If you point AppConfig at a LAN IP instead of 10.0.2.2 to test from
+a physical device, add that IP here too (or switch the dev server to HTTPS).
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

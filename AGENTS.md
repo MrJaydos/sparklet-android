@@ -8,14 +8,47 @@ Android client only.
 
 ## Status
 
-No code yet. A sibling client (`sparklet-ios`, same backend) is further
-along and has already surfaced one shared blocker — see "Auth" below before
-scaffolding anything here.
+Scaffolded (2026-07-28): native Kotlin/Jetpack Compose, a Gradle project
+(no wrapper committed — see Commands), a paged single-card feed screen
+backed by `GET /api/feed`, the two-POST read-tracking flow against
+`/api/interactions` (tracking only the one card actually settled on
+screen — see the comment on `FeedScreen.kt`'s `pagerState.settledPage`
+usage, this was a real integrity bug in `sparklet-ios`'s earlier pass and
+is worth not repeating here), and a header stats row backed by
+`GET /api/profile`. Auth (`auth/LoginController.kt`,
+`auth/AuthRedirect.kt`) matches the backend's real mobile-auth contract
+(code-exchange via Custom Tabs, not `sparklet-ios`'s
+`ASWebAuthenticationSession` callback shape — Custom Tabs has no direct
+callback, so the redirect is bridged back via `AuthRedirect`'s
+`onNewIntent`/`onResume` handling instead), confirmed live against
+`sparklet`'s `main` (commit `89be8be`) and with `sparklet-android` already
+in `ALLOWED_MOBILE_SCHEMES` while scaffolding this. Not yet built:
+quiz/guess/misconception/review answering (`sparklet-ios` hasn't built
+that either, so this isn't Android falling behind a finished web/iOS
+surface).
+
+**Gradle sync verified (2026-07-29)**: opened in Android Studio (bundled
+JBR 21 + Android SDK with platform `android-36.1`/build-tools `36.0.0`),
+which synced successfully using its own bundled Gradle — auto-upgrading
+AGP to `8.13.2`, the Gradle wrapper target to `8.13`, adding the
+`org.gradle.toolchains.foojay-resolver-convention` plugin to
+`settings.gradle.kts` (needed to auto-resolve JDK toolchains), and
+generating `gradle/gradle-daemon-jvm.properties` pinning the daemon to
+JetBrains JDK 21. That verifies the Gradle *configuration* — dependency
+resolution, plugin versions — but not yet a full compile of the Kotlin/
+Compose sources; run Build → Make Project (or the Run button) to confirm
+those. `compileSdk`/`targetSdk` are still `34` in `app/build.gradle.kts`
+while the SDK only has platform `36.1` installed — if a real build asks
+for platform 34, that's Studio's SDK Manager doing its job, not a project
+misconfiguration. No `gradlew`/wrapper jar was generated — Studio synced
+via its own bundled Gradle rather than materializing the project's own
+wrapper — so a command-line build still needs that step done manually
+(`gradle wrapper` once a local Gradle install exists).
 
 ## Backend reference
 
 The backend lives in a sibling repo on this machine:
-`C:\Users\jayde\onedrive\repos\sparklet`. Treat it as the single source of
+`C:\Users\jayde\repos\Sparklet`. Treat it as the single source of
 truth for the API contract — read there, don't duplicate or guess:
 
 - `AGENTS.md` — architecture, conventions, engagement-integrity rules (read
@@ -29,7 +62,7 @@ truth for the API contract — read there, don't duplicate or guess:
 - `src/lib/xp.ts`, `src/lib/feed.ts` — XP/streak/feed-composition rules the
   client must respect rather than reimplement independently
 
-A second sibling repo, `C:\Users\jayde\onedrive\repos\sparklet-ios`, is a
+A second sibling repo, `C:\Users\jayde\repos\sparklet-ios`, is a
 native iOS client against the same backend and API contract. Its `AGENTS.md`
 is worth reading before making architecture calls here — anything it already
 resolved about the backend contract (not UI) applies equally to Android.
@@ -60,14 +93,18 @@ UI that matches them rather than fights them:
 
 ## Decisions made
 
-- **Auth: token-based, backend built and pushed to `sparklet`'s `main` as of
+1. **Auth: token-based, backend built and pushed to `sparklet`'s `main` as of
   2026-07-28** (commit `89be8be`, deploying via Coolify same day). This is
   no longer open — implement Android's side against the real contract below
   rather than re-deciding it. Embedded WebViews
   doing Google OAuth trip Google's `disallowed_useragent` block on both
   platforms, so sign-in has to happen in an external user-agent (Custom Tabs
   here, matching `ASWebAuthenticationSession` on iOS), and the raw session
-  cookie that flow produces can't cross into a native app anyway. The
+  cookie that flow produces can't cross into a native app anyway (unlike
+  `ASWebAuthenticationSession`, Custom Tabs has no direct completion
+  callback — the redirect arrives as a separate Intent, bridged back to the
+  in-flight sign-in via `AuthRedirect`'s `onNewIntent`/`onResume` handling;
+  see `auth/AuthRedirect.kt`). The
   backend uses a short-lived one-time-code handoff (RFC 8252-style), not a
   token embedded directly in a redirect — a token in a URL sits in browser
   history/OS logs and goes to whatever app the OS resolves a custom scheme
@@ -103,23 +140,46 @@ UI that matches them rather than fights them:
   against the deployed app or from an actual Android client — if a request
   against `sparkletapp.com` behaves differently than this section describes,
   trust what you observe over this doc and update it.
-2. **Push.** Backend push is VAPID web-push (`PushSubscription` model,
-   `src/lib/push.ts`) — cannot run in a native app (no service worker).
-   Native Android push needs Firebase Cloud Messaging: a device registration
-   token, not a VAPID subscription. Decide whether v1 ships with no
-   notifications (iOS is doing this) or adds an FCM path — if the backend's
-   `PushSubscription` model gets a `platform` discriminator column for one
-   native client, do it for both at once rather than migrating twice.
-3. **Client architecture.** Native Kotlin/Jetpack Compose vs. a hybrid
-   (Capacitor/React Native) wrapping the existing web app. `sparklet-ios`
-   went native SwiftUI for feed feel/performance; the same reasoning applies
-   here, but confirm before scaffolding since it commits to rebuilding the
-   feed/quiz/guess/misconception UI natively rather than reusing web code.
+2. **Push: deferred for v1, matching `sparklet-ios`.** Existing push is
+   VAPID web-push (`PushSubscription` model, `src/lib/push.ts`) — cannot run
+   in a native app (no service worker). Native Android push would need
+   Firebase Cloud Messaging (a device registration token, not a VAPID
+   subscription) plus a real server-side FCM send path, not just a client
+   SDK add. v1 ships with zero notifications. This has a real product cost,
+   not a free one — streaks/daily-goal are the retention mechanic, and
+   shipping without push weakens that from day one; revisit once there's
+   appetite to touch `PushSubscription` on both platforms at once (add the
+   `platform` discriminator column then, rather than migrating twice).
+3. **Client architecture: native Kotlin/Jetpack Compose**, not a hybrid
+   (Capacitor/React Native) wrapper. The mobile-auth contract that just
+   shipped (see above) is native-shaped by construction — Custom Tabs →
+   custom-scheme intent → direct HTTPS POST exchange → `Bearer` token,
+   specifically because cookie-carrying webviews are disallowed for Google
+   OAuth. A hybrid wrapper would want exactly the cookie-in-webview session
+   the backend was just re-engineered to avoid, fighting that work rather
+   than using it. `sparklet-ios` went native SwiftUI for the same reasoning
+   plus feed feel/performance. Cost: rebuilding feed/quiz/guess/
+   misconception/review UI natively rather than reusing the web app's React
+   code — and `sparklet-ios` hasn't finished the quiz/guess/review-answering
+   surface either, so Android starts behind web on that UI, not at parity.
 
 ## Commands
 
-No build yet — no Gradle project scaffolded. Once it exists, replace this
-section with the real module name and Gradle invocation (for local builds
-and any CI), plus how to point a local build at the backend (local Next.js
-dev server on the LAN IP + `PORT=3001`, vs. sparkletapp.com — Android
-emulators reach the host machine via `10.0.2.2`, not `localhost`).
+No Gradle wrapper is committed — generating `gradlew`/`gradle-wrapper.jar`
+needs a local Gradle install, which the environment this was scaffolded in
+doesn't have. Requires Android Studio (bundles a JDK; installs SDK
+platforms via its SDK Manager):
+
+```bash
+# Open the repo root directly in Android Studio — it recognizes the
+# settings.gradle.kts/build.gradle.kts files and offers to generate the
+# wrapper and sync on first open.
+```
+
+No CI yet. To point a local build at the `sparklet` dev server instead of
+production, edit `app/src/main/java/com/sparklet/android/config/AppConfig.kt`'s
+`apiBaseUrl` — Android emulators reach the host machine via `10.0.2.2`, not
+`localhost` (already allowed for cleartext HTTP in
+`app/src/main/res/xml/network_security_config.xml`); a physical device
+needs your machine's LAN IP added there instead. Either way, use the port
+from that repo's `npm run dev` (`PORT=3001`).
