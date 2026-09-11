@@ -8,9 +8,21 @@ Android client only.
 
 ## Status
 
-Scaffolded (2026-07-28): native Kotlin/Jetpack Compose, a Gradle project
-(no wrapper committed — see Commands), a paged single-card feed screen
-backed by `GET /api/feed`, the two-POST read-tracking flow against
+**Updated 2026-09-11: builds and runs on a physical device** (Galaxy Z Flip 7,
+`SM-F766B`, Android 16) from a command-line `./gradlew :app:assembleDebug` —
+a Gradle wrapper is now committed, so no local Gradle install is needed. The
+Kotlin/Compose sources are confirmed to compile, not merely resolve. The
+quiz/guess/misconception/review answering surface listed as "not yet built"
+below has since been built (commit `4689c97`), putting Android ahead of
+`sparklet-ios` there. Sign-in, feed, stats header and challenge
+cards are confirmed working end-to-end against production on-device. With the
+Sparklet PWA installed, Chrome routes sign-in through the PWA instead of the
+Custom Tab; it still completes and hands back via `sparklet-android://auth`,
+but the detour is confusing UX worth fixing. See README's "Testing sign-in".
+
+Scaffolded (2026-07-28): native Kotlin/Jetpack Compose, a Gradle project,
+a paged single-card feed screen backed by `GET /api/feed`, the two-POST
+read-tracking flow against
 `/api/interactions` (tracking only the one card actually settled on
 screen — see the comment on `FeedScreen.kt`'s `pagerState.settledPage`
 usage, this was a real integrity bug in `sparklet-ios`'s earlier pass and
@@ -22,10 +34,9 @@ is worth not repeating here), and a header stats row backed by
 callback, so the redirect is bridged back via `AuthRedirect`'s
 `onNewIntent`/`onResume` handling instead), confirmed live against
 `sparklet`'s `main` (commit `89be8be`) and with `sparklet-android` already
-in `ALLOWED_MOBILE_SCHEMES` while scaffolding this. Not yet built:
-quiz/guess/misconception/review answering (`sparklet-ios` hasn't built
-that either, so this isn't Android falling behind a finished web/iOS
-surface).
+in `ALLOWED_MOBILE_SCHEMES` while scaffolding this. (Quiz/guess/
+misconception/review answering was listed here as not yet built; it was
+built in `4689c97` — see the status note above.)
 
 **Gradle sync verified (2026-07-29)**: opened in Android Studio (bundled
 JBR 21 + Android SDK with platform `android-36.1`/build-tools `36.0.0`),
@@ -40,16 +51,45 @@ Compose sources; run Build → Make Project (or the Run button) to confirm
 those. `compileSdk`/`targetSdk` are still `34` in `app/build.gradle.kts`
 while the SDK only has platform `36.1` installed — if a real build asks
 for platform 34, that's Studio's SDK Manager doing its job, not a project
-misconfiguration. No `gradlew`/wrapper jar was generated — Studio synced
-via its own bundled Gradle rather than materializing the project's own
-wrapper — so a command-line build still needs that step done manually
-(`gradle wrapper` once a local Gradle install exists).
+misconfiguration. (Superseded 2026-09-11: a full compile is now verified,
+and a wrapper is committed — command-line builds need no manual step. The
+installed platform is `android-36`, not `36.1`; AGP fetches platform 34 on
+demand.)
+
+## Logging mistakes
+
+`MISTAKES.md` in this repo is a running log of mistakes made while working
+here — what happened, how it happened, and how it was fixed. **Keep it up to
+date.** When you get something wrong, add an entry (newest first) before
+moving on.
+
+Log a mistake when it changed what got written, committed, or believed:
+
+- a wrong conclusion that made it into these docs, a commit message, or a
+  handoff summary — this is the expensive category, because `AGENTS.md` and
+  `README.md` are the handoff between sessions and nothing type-checks them;
+- a change to someone's device, environment, or account made on an assumption
+  that turned out to be wrong, especially an irreversible one;
+- a tooling trap that cost real time and will cost it again (the foldable
+  `screencap` trap in `MISTAKES.md` is the model here).
+
+Don't log routine iteration — a compile error you fixed, a first draft you
+revised. The bar is "the next session would be worse off not knowing this".
+
+Write each entry with the three headings the file already uses (**What
+happened**, **How it happened**, **How it was fixed**), plus a **Rule going
+forward** when there is a generalisable one. Be specific and unsparing about
+the reasoning error, not just the symptom — "I treated a 2-second window of
+silence as proof of a dead end" is useful; "I made an incorrect assumption" is
+not.
 
 ## Backend reference
 
-The backend lives in a sibling repo on this machine:
-`C:\Users\jayde\repos\Sparklet`. Treat it as the single source of
-truth for the API contract — read there, don't duplicate or guess:
+The backend lives in a sibling repo checked out next to this one
+(`../Sparklet`; the path is machine-specific — it was `C:\Users\jayde\repos\Sparklet`
+when this was written, `/Users/jaydendickinson/repos/Sparklet` on the macOS
+machine used since). Treat it as the single source of truth for the API
+contract — read there, don't duplicate or guess:
 
 - `AGENTS.md` — architecture, conventions, engagement-integrity rules (read
   this first; the rules below assume it)
@@ -62,7 +102,7 @@ truth for the API contract — read there, don't duplicate or guess:
 - `src/lib/xp.ts`, `src/lib/feed.ts` — XP/streak/feed-composition rules the
   client must respect rather than reimplement independently
 
-A second sibling repo, `C:\Users\jayde\repos\sparklet-ios`, is a
+A second sibling repo, `../sparklet-ios`, is a
 native iOS client against the same backend and API contract. Its `AGENTS.md`
 is worth reading before making architecture calls here — anything it already
 resolved about the backend contract (not UI) applies equally to Android.
@@ -112,7 +152,12 @@ UI that matches them rather than fights them:
   1. Open `/login?mobileScheme=sparklet-android` in Custom Tabs.
      `sparklet-android` must exactly match an entry in
      `ALLOWED_MOBILE_SCHEMES` (`src/lib/mobile-auth.ts` in the backend repo)
-     — it's a fixed allowlist, not a passthrough; anything else 400s.
+     — it's a fixed allowlist, not a passthrough. **Corrected 2026-09-11:**
+     an unlisted scheme does *not* 400 here. `src/app/login/page.tsx` just
+     falls through to an ordinary web login (`safeRedirect(callbackUrl)`),
+     so a typo'd scheme looks like a successful sign-in in the browser while
+     the app waits forever for a redirect that is never sent. The 400 is
+     enforced one step later, in `/api/auth/mobile-complete`.
   2. Once Google/Apple/magic-link sign-in completes, the backend redirects
      (still holding the session cookie it just set) to
      `/api/auth/mobile-complete?scheme=sparklet-android`, which mints a
@@ -165,21 +210,32 @@ UI that matches them rather than fights them:
 
 ## Commands
 
-No Gradle wrapper is committed — generating `gradlew`/`gradle-wrapper.jar`
-needs a local Gradle install, which the environment this was scaffolded in
-doesn't have. Requires Android Studio (bundles a JDK; installs SDK
-platforms via its SDK Manager):
+A Gradle wrapper **is** committed as of 2026-09-11 (generated with a
+standalone Gradle 9.3.1 in a throwaway directory and copied in, pinned to the
+Gradle 8.13 the existing `gradle-wrapper.properties` already targeted), so
+command-line builds no longer need a local Gradle install — only a JDK 17+:
 
 ```bash
-# Open the repo root directly in Android Studio — it recognizes the
-# settings.gradle.kts/build.gradle.kts files and offers to generate the
-# wrapper and sync on first open.
+export JAVA_HOME=/path/to/a/jdk17
+./gradlew :app:assembleDebug     # ~18 min cold, ~20s incremental
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-No CI yet. To point a local build at the `sparklet` dev server instead of
-production, edit `app/src/main/java/com/sparklet/android/config/AppConfig.kt`'s
-`apiBaseUrl` — Android emulators reach the host machine via `10.0.2.2`, not
-`localhost` (already allowed for cleartext HTTP in
-`app/src/main/res/xml/network_security_config.xml`); a physical device
-needs your machine's LAN IP added there instead. Either way, use the port
-from that repo's `npm run dev` (`PORT=3001`).
+Opening the repo root in Android Studio still works as before.
+
+No CI yet. The API base URL is no longer hardcoded in `AppConfig.kt` — it
+defaults to production and is overridden by a Gradle property, so pointing at
+a dev server never means editing (or accidentally committing) tracked source:
+
+```properties
+# local.properties, gitignored
+sparklet.apiBaseUrl=http://192.168.1.42:3001
+```
+
+It previously *was* hardcoded, to `http://10.0.2.2:3001` — the emulator's
+alias for the host machine, which resolves to nothing on a physical device,
+so every device build silently failed every request. Emulators reach the host
+at `10.0.2.2`; a physical device needs the machine's LAN IP. Debug builds
+permit cleartext to any host (`app/src/debug/res/xml/network_security_config.xml`)
+so no per-IP allowlisting is needed; release builds stay HTTPS-only. Use the
+port from that repo's `npm run dev` (`PORT=3001`).
