@@ -85,6 +85,12 @@ fun FeedScreen(authSession: AuthSession) {
     var showingMap by remember { mutableStateOf(false) }
     var commentsCardId by remember { mutableStateOf<String?>(null) }
     var reportCardId by remember { mutableStateOf<String?>(null) }
+    var showingSettings by remember { mutableStateOf(false) }
+    val categorySlugs by viewModel.categorySlugs.collectAsState()
+    // Edited locally while the sheet is open and committed on dismiss —
+    // applying per tap would POST /api/interests and rebuild the feed once
+    // per chip.
+    var pendingTopics by remember { mutableStateOf<Set<String>?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.loadIfNeeded()
@@ -155,6 +161,10 @@ fun FeedScreen(authSession: AuthSession) {
             onOpenProfile = { showingProfile = true },
             onOpenFriends = { showingFriends = true },
             onOpenMap = { showingMap = true },
+            onOpenSettings = {
+                pendingTopics = categorySlugs.toSet()
+                showingSettings = true
+            },
         )
 
         PullToRefreshBox(
@@ -282,6 +292,27 @@ fun FeedScreen(authSession: AuthSession) {
             containerColor = SparkletColors.Background,
         ) {
             KnowledgeMapScreen(mapViewModel)
+        }
+    }
+
+    if (showingSettings) {
+        ModalBottomSheet(
+            onDismissRequest = {
+                showingSettings = false
+                val chosen = pendingTopics
+                pendingTopics = null
+                if (chosen != null && chosen != categorySlugs.toSet()) {
+                    scope.launch { viewModel.setInterests(chosen.toList()) }
+                }
+            },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = SparkletColors.Background,
+        ) {
+            FeedSettingsSheet(
+                token = token,
+                selected = pendingTopics ?: categorySlugs.toSet(),
+                onSelectedChange = { pendingTopics = it },
+            )
         }
     }
 

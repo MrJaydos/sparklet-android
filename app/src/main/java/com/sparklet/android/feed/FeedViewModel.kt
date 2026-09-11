@@ -10,6 +10,7 @@ import com.sparklet.android.model.FeedQuiz
 import com.sparklet.android.model.FeedReviewQuiz
 import com.sparklet.android.model.XpSummary
 import com.sparklet.android.network.ApiException
+import com.sparklet.android.network.OnboardingApi
 import com.sparklet.android.network.FeedApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -51,6 +52,17 @@ class FeedViewModel(private val authSession: AuthSession) : ViewModel() {
     // tuned for.
     private var cardsConsumed = 0
 
+    private val onboardingApi = OnboardingApi()
+
+    // The topic filter. The UserInterest table is the durable cross-device
+    // source of truth (see OnboardingApi.fetchInterests), so this is read
+    // from the server on first load rather than persisted locally. Empty
+    // means "everything", which is also what the backend treats an empty
+    // selection as.
+    private val _categorySlugs = MutableStateFlow<List<String>>(emptyList())
+    val categorySlugs: StateFlow<List<String>> = _categorySlugs.asStateFlow()
+    private var interestsLoaded = false
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
@@ -59,6 +71,15 @@ class FeedViewModel(private val authSession: AuthSession) : ViewModel() {
 
     fun clearError() {
         _errorMessage.value = null
+    }
+
+    // Persists the topic filter server-side, then reloads the feed outright:
+    // the already-loaded batch was composed under the old filter, so keeping
+    // it would leave the user looking at topics they just deselected.
+    suspend fun setInterests(slugs: List<String>) {
+        _categorySlugs.value = slugs
+        runCatching { onboardingApi.submitInterests(slugs, authSession.token.value) }
+        load()
     }
 
     suspend fun loadIfNeeded() {
@@ -75,7 +96,20 @@ class FeedViewModel(private val authSession: AuthSession) : ViewModel() {
         _isLoading.value = true
         _errorMessage.value = null
         try {
-            val response = api.fetchFeed(take = 10, token = authSession.token.value)
+            // Fetched once per session, before the first batch, so the very
+            // first cards already respect the filter rather than showing an
+            // unfiltered batch that then changes under the user.
+            if (!interestsLoaded) {
+                interestsLoaded = true
+                _categorySlugs.value = runCatching {
+                    onboardingApi.fetchInterests(authSession.token.value)
+                }.getOrDefault(emptyList())
+            }
+            val response = api.fetchFeed(
+                categorySlugs = _categorySlugs.value,
+                take = 10,
+                token = authSession.token.value,
+            )
             cards = response.cards
             quizzes = response.quizzes
             quizCursor = 0
@@ -112,6 +146,7 @@ class FeedViewModel(private val authSession: AuthSession) : ViewModel() {
             val excludeIds = cards.map { it.id } +
                 _items.value.filterIsInstance<FeedItem.ReviewQuiz>().map { it.quiz.sourceCardId }
             val response = api.fetchFeed(
+                categorySlugs = _categorySlugs.value,
                 take = 10,
                 excludeIds = excludeIds,
                 token = authSession.token.value,
