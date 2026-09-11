@@ -40,6 +40,7 @@ class StatsHeaderViewModel(private val authSession: AuthSession) : ViewModel() {
         // lifetime sum — only today/goal are meaningful there. Falling back
         // to the last known xp avoids clobbering it to zero.
         _profile.value = ProfileResponse(
+            id = current.id,
             xp = if (xp.awarded > 0) xp.total else current.xp,
             xpToday = xp.today,
             xpGoal = xp.goal,
@@ -47,6 +48,11 @@ class StatsHeaderViewModel(private val authSession: AuthSession) : ViewModel() {
             currentStreak = xp.streak?.currentStreak ?: current.currentStreak,
             longestStreak = xp.streak?.longestStreak ?: current.longestStreak,
             freezesAvailable = xp.streak?.freezesAvailable ?: current.freezesAvailable,
+            // Never re-derived from an XP response: this is a server-computed
+            // one-time condition, and the interactions route doesn't report
+            // it. Carrying the last known value keeps a mid-session award
+            // from re-triggering onboarding.
+            needsOnboarding = current.needsOnboarding,
         )
     }
 }

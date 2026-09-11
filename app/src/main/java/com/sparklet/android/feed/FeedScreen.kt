@@ -10,6 +10,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -25,6 +26,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sparklet.android.auth.AuthSession
 import com.sparklet.android.model.FeedItem
@@ -35,6 +38,8 @@ import com.sparklet.android.friends.FriendsViewModel
 import com.sparklet.android.map.KnowledgeMapScreen
 import com.sparklet.android.map.KnowledgeMapViewModel
 import com.sparklet.android.model.pagerKey
+import com.sparklet.android.onboarding.OnboardingScreen
+import com.sparklet.android.onboarding.OnboardingViewModel
 import com.sparklet.android.notifications.NotificationsScreen
 import com.sparklet.android.notifications.NotificationsViewModel
 import com.sparklet.android.profile.ProfileScreen
@@ -91,6 +96,12 @@ fun FeedScreen(authSession: AuthSession) {
     // applying per tap would POST /api/interests and rebuild the feed once
     // per chip.
     var pendingTopics by remember { mutableStateOf<Set<String>?>(null) }
+    // Server-computed one-time condition. Latched into local state once seen
+    // so that dismissing it sticks for the session — the profile response it
+    // came from isn't re-fetched, and re-showing it after "Skip" would be
+    // worse than showing it once too rarely.
+    var showingOnboarding by remember { mutableStateOf(false) }
+    var onboardingHandled by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.loadIfNeeded()
@@ -150,6 +161,13 @@ fun FeedScreen(authSession: AuthSession) {
             if (target < viewModel.items.value.size) {
                 pagerState.animateScrollToPage(target)
             }
+        }
+    }
+
+    LaunchedEffect(profile?.needsOnboarding) {
+        if (profile?.needsOnboarding == true && !onboardingHandled) {
+            onboardingHandled = true
+            showingOnboarding = true
         }
     }
 
@@ -298,6 +316,34 @@ fun FeedScreen(authSession: AuthSession) {
             containerColor = SparkletColors.Background,
         ) {
             KnowledgeMapScreen(mapViewModel)
+        }
+    }
+
+    // Full-screen rather than a bottom sheet: it stands in for the web's own
+    // /onboarding route, and a dismissible sheet would let the user swipe past
+    // the one moment the topic picker is actually in front of them.
+    if (showingOnboarding) {
+        val onboardingViewModel = viewModel { OnboardingViewModel(authSession) }
+        Dialog(
+            onDismissRequest = { },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false,
+            ),
+        ) {
+            Surface(modifier = Modifier.fillMaxSize(), color = SparkletColors.Background) {
+                OnboardingScreen(
+                    viewModel = onboardingViewModel,
+                    onComplete = {
+                        showingOnboarding = false
+                        // The picks just written are the feed's topic filter,
+                        // so pull them through rather than leaving the feed on
+                        // the batch fetched before onboarding.
+                        scope.launch { viewModel.load() }
+                    },
+                )
+            }
         }
     }
 

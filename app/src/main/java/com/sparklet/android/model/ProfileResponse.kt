@@ -9,6 +9,7 @@ import kotlinx.serialization.Serializable
 // answers "did I hit my count today".
 @Serializable
 data class ProfileResponse(
+    val id: String,
     val xp: Int,
     val xpToday: Int,
     val xpGoal: Int,
@@ -16,4 +17,10 @@ data class ProfileResponse(
     val currentStreak: Int,
     val longestStreak: Int,
     val freezesAvailable: Int,
+    // Same one-time "first session, never onboarded" condition as the web's
+    // feed-page redirect (sparklet/src/app/feed/page.tsx), computed
+    // server-side. This client has no server-driven redirect to hook into, so
+    // the feed shows the onboarding sheet on it instead. Defaulted so an
+    // older backend that doesn't send it can't break decoding.
+    val needsOnboarding: Boolean = false,
 )
