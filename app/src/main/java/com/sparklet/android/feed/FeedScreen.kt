@@ -98,6 +98,7 @@ fun FeedScreen(authSession: AuthSession) {
     var showingMap by remember { mutableStateOf(false) }
     var commentsCardId by remember { mutableStateOf<String?>(null) }
     var reportCardId by remember { mutableStateOf<String?>(null) }
+    var detailCardId by remember { mutableStateOf<String?>(null) }
     var showingSettings by remember { mutableStateOf(false) }
     val categorySlugs by viewModel.categorySlugs.collectAsState()
     // Edited locally while the sheet is open and committed on dismiss —
@@ -239,6 +240,7 @@ fun FeedScreen(authSession: AuthSession) {
                             token = token,
                             onOpenComments = { commentsCardId = item.card.id },
                             onOpenReport = { reportCardId = item.card.id },
+                            onOpenRelated = { detailCardId = it },
                         )
                         is FeedItem.Quiz -> QuizAnswerView(
                             id = item.quiz.id,
@@ -414,6 +416,20 @@ fun FeedScreen(authSession: AuthSession) {
                 token = token,
                 selected = pendingTopics ?: categorySlugs.toSet(),
                 onSelectedChange = { pendingTopics = it },
+            )
+        }
+    }
+
+    detailCardId?.let { cardId ->
+        ModalBottomSheet(
+            onDismissRequest = { detailCardId = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = SparkletColors.Background,
+        ) {
+            CardDetailSheet(
+                cardId = cardId,
+                token = token,
+                onOpenRelated = { detailCardId = it },
             )
         }
     }

@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.sparklet.android.ui.theme.SparkletColors
@@ -49,6 +50,7 @@ fun CardView(
     token: String?,
     onOpenComments: () -> Unit,
     onOpenReport: () -> Unit,
+    onOpenRelated: (String) -> Unit,
 ) {
     val context = LocalContext.current
     val preferences = remember { FeedPreferences(context) }
@@ -149,6 +151,26 @@ fun CardView(
             onOpenComments = onOpenComments,
             onOpenReport = onOpenReport,
         )
+
+        // Related links are the entry point to CardDetailSheet; the feed
+        // card itself stays a single non-scrolling page.
+        if (card.related.isNotEmpty()) {
+            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                for (link in card.related.take(2)) {
+                    Text(
+                        "${link.icon} ${link.title}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = SparkletColors.TextMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onOpenRelated(link.id) }
+                            .padding(end = 8.dp),
+                    )
+                }
+            }
+        }
 
         card.sources.firstOrNull()?.let { source ->
             Spacer(modifier = Modifier.padding(top = 8.dp))
