@@ -9,6 +9,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -26,7 +28,10 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sparklet.android.auth.AuthSession
 import com.sparklet.android.model.FeedItem
+import com.sparklet.android.leaderboard.LeaderboardScreen
+import com.sparklet.android.leaderboard.LeaderboardViewModel
 import com.sparklet.android.model.pagerKey
+import com.sparklet.android.ui.theme.SparkletColors
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
@@ -65,6 +70,7 @@ fun FeedScreen(authSession: AuthSession) {
     val pagerState = rememberPagerState(pageCount = { items.size })
     val scope = rememberCoroutineScope()
     var isRefreshing by remember { mutableStateOf(false) }
+    var showingLeaderboard by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.loadIfNeeded()
@@ -128,7 +134,7 @@ fun FeedScreen(authSession: AuthSession) {
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        StatsHeaderView(profile)
+        StatsHeaderView(profile, onOpenLeaderboard = { showingLeaderboard = true })
 
         PullToRefreshBox(
             isRefreshing = isRefreshing,
@@ -192,6 +198,20 @@ fun FeedScreen(authSession: AuthSession) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 }
             }
+        }
+    }
+
+    // Everything that isn't the feed opens as a sheet over it, matching
+    // sparklet-ios — the feed is never torn down and its pager position,
+    // in-flight read tracking and loaded batch all survive the detour.
+    if (showingLeaderboard) {
+        val leaderboardViewModel = viewModel { LeaderboardViewModel(authSession) }
+        ModalBottomSheet(
+            onDismissRequest = { showingLeaderboard = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = SparkletColors.Background,
+        ) {
+            LeaderboardScreen(leaderboardViewModel)
         }
     }
 
