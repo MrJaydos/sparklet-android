@@ -46,6 +46,22 @@ class FeedPreferences(context: Context) {
         return true
     }
 
+    // One-time swipe hint, mirroring Feed.tsx's. Persisted rather than
+    // session-scoped: it's an onboarding affordance, not a recurring nudge.
+    var hasSeenSwipeHint: Boolean
+        get() = prefs.getBoolean(SWIPE_HINT_KEY, false)
+        set(value) = prefs.edit().putBoolean(SWIPE_HINT_KEY, value).apply()
+
+    // "Every other session" gating for the in-feed invite prompt, resolved
+    // once per FeedViewModel lifetime — mirrors Feed.tsx's mount effect over
+    // `sparklet.inviteSessionCount`. Increments on read, so each call is a
+    // new session by definition.
+    fun nextSessionShowsInvite(): Boolean {
+        val next = prefs.getInt(INVITE_SESSION_COUNT_KEY, 0) + 1
+        prefs.edit().putInt(INVITE_SESSION_COUNT_KEY, next).apply()
+        return next % 2 == 0
+    }
+
     companion object {
         const val DEFAULT_DAILY_CARD_GOAL = 10
         val DAILY_CARD_GOAL_OPTIONS = listOf(5, 10, 15, 20, 30)
@@ -53,5 +69,7 @@ class FeedPreferences(context: Context) {
         private const val GOAL_KEY = "sparklet.dailyGoal"
         private const val GOAL_HIT_KEY = "sparklet.goalHit"
         private const val DEPTH_KEY = "sparklet.depth"
+        private const val INVITE_SESSION_COUNT_KEY = "sparklet.inviteSessionCount"
+        private const val SWIPE_HINT_KEY = "sparklet.swipeHintSeen"
     }
 }

@@ -39,6 +39,23 @@ sealed class FeedItem {
     data class Explain(val prompt: FeedExplainPrompt) : FeedItem() {
         override val id = prompt.id
     }
+
+    // The three below have no server-side model at all — they're
+    // session-recap/growth slides inserted purely client-side, mirroring
+    // Feed.tsx's `{ kind: "checkin", afterCount }` and friends. `afterCount`
+    // is only used for id uniqueness; the copy reads live session state from
+    // the view model rather than this frozen snapshot.
+    data class Checkin(val afterCount: Int) : FeedItem() {
+        override val id = "checkin-$afterCount"
+    }
+
+    data object Invite : FeedItem() {
+        override val id = "invite"
+    }
+
+    data object GoalReached : FeedItem() {
+        override val id = "goalReached"
+    }
 }
 
 // Pager page key: prefixed by kind rather than the bare id, since nothing
@@ -51,4 +68,7 @@ val FeedItem.pagerKey: String
         is FeedItem.Guess -> "guess:$id"
         is FeedItem.Misconception -> "misconception:$id"
         is FeedItem.Explain -> "explain:$id"
+        is FeedItem.Checkin -> "checkin:$id"
+        is FeedItem.Invite -> "invite"
+        is FeedItem.GoalReached -> "goalReached"
     }

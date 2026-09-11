@@ -4,12 +4,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
@@ -26,6 +28,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -71,7 +75,9 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FeedScreen(authSession: AuthSession) {
-    val viewModel = viewModel { FeedViewModel(authSession) }
+    val context = LocalContext.current
+    val preferences = remember { FeedPreferences(context) }
+    val viewModel = viewModel { FeedViewModel(authSession, preferences) }
     val statsViewModel = viewModel { StatsHeaderViewModel(authSession) }
 
     val items by viewModel.items.collectAsState()
@@ -79,6 +85,8 @@ fun FeedScreen(authSession: AuthSession) {
     val errorMessage by viewModel.errorMessage.collectAsState()
     val profile by statsViewModel.profile.collectAsState()
     val token by authSession.token.collectAsState()
+    val sessionViews by viewModel.sessionViews.collectAsState()
+    val sessionTopicCount by viewModel.sessionTopicCount.collectAsState()
 
     val pagerState = rememberPagerState(pageCount = { items.size })
     val scope = rememberCoroutineScope()
@@ -101,6 +109,9 @@ fun FeedScreen(authSession: AuthSession) {
     // came from isn't re-fetched, and re-showing it after "Skip" would be
     // worse than showing it once too rarely.
     var showingOnboarding by remember { mutableStateOf(false) }
+    // Gated on more than one item, like the web's: a hint telling you to
+    // swipe is worse than useless over a feed with nothing to swipe to.
+    var showingSwipeHint by remember { mutableStateOf(!preferences.hasSeenSwipeHint) }
     var onboardingHandled by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -131,8 +142,17 @@ fun FeedScreen(authSession: AuthSession) {
             .distinctUntilChangedBy { it.pagerKey }
             .collect { item ->
                 if (item is FeedItem.Card) {
+                    // Counted on arrival, before the dwell gate — see
+                    // markSessionView. trackView suspends ~4.7s below, so
+                    // doing this after would delay the recap copy by a card.
+                    viewModel.markSessionView(item.card)
                     val xp = viewModel.trackView(item.card.id)
-                    if (xp != null) statsViewModel.apply(xp)
+                    if (xp != null) {
+                        statsViewModel.apply(xp)
+                        viewModel.markGoalReachedIfNeeded(
+                            statsViewModel.profile.value?.cardsToday ?: 0
+                        )
+                    }
                 }
             }
     }
@@ -146,6 +166,12 @@ fun FeedScreen(authSession: AuthSession) {
         snapshotFlow { pagerState.settledPage }
             .distinctUntilChanged()
             .collect { page ->
+                // Any settle past the first page means the user has worked
+                // out the gesture — retire the hint for good.
+                if (page > 0 && showingSwipeHint) {
+                    showingSwipeHint = false
+                    preferences.hasSeenSwipeHint = true
+                }
                 viewModel.loadMoreIfNeeded(page, viewModel.items.value.size)
             }
     }
@@ -240,6 +266,19 @@ fun FeedScreen(authSession: AuthSession) {
                             onResult = { xp -> statsViewModel.apply(xp) },
                             onContinue = { advance(page) },
                         )
+                        is FeedItem.Checkin -> CheckinSlide(
+                            sessionViews = sessionViews,
+                            topicCount = sessionTopicCount,
+                            onContinue = { advance(page) },
+                        )
+                        FeedItem.Invite -> InviteSlide(onContinue = { advance(page) })
+                        FeedItem.GoalReached -> GoalReachedSlide(
+                            cardsToday = profile?.cardsToday ?: 0,
+                            dailyGoal = preferences.dailyCardGoal,
+                            sessionViews = sessionViews,
+                            topicCount = sessionTopicCount,
+                            onContinue = { advance(page) },
+                        )
                         is FeedItem.Explain -> ExplainAnswerView(
                             prompt = item.prompt,
                             token = token,
@@ -256,6 +295,17 @@ fun FeedScreen(authSession: AuthSession) {
                 }
                 if (isLoading && items.isEmpty()) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                }
+
+                if (showingSwipeHint && items.size > 1) {
+                    Text(
+                        "Swipe up for the next card",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = SparkletColors.TextTertiary,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 32.dp),
+                    )
                 }
             }
         }

@@ -20,7 +20,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-class FeedViewModel(private val authSession: AuthSession) : ViewModel() {
+class FeedViewModel(
+    private val authSession: AuthSession,
+    private val preferences: FeedPreferences,
+) : ViewModel() {
     private val api = FeedApi()
 
     // The single source of truth the pager renders from — plain cards
@@ -65,6 +68,21 @@ class FeedViewModel(private val authSession: AuthSession) : ViewModel() {
     // shape here. Without this the feed silently stopped appending after
     // roughly one lap through the pool.
     private var exhausted = false
+
+    // Session-recap state — purely client-side and scoped to this app launch,
+    // mirroring Feed.tsx's sessionViewsRef/sessionCategories.
+    private val _sessionViews = MutableStateFlow(0)
+    val sessionViews: StateFlow<Int> = _sessionViews.asStateFlow()
+    private val _sessionTopicCount = MutableStateFlow(0)
+    val sessionTopicCount: StateFlow<Int> = _sessionTopicCount.asStateFlow()
+    private val viewedCardIds = mutableSetOf<String>()
+    private val sessionCategories = mutableSetOf<String>()
+
+    // Resolved once per view model lifetime, i.e. effectively once per app
+    // launch, since the feed only ever creates one.
+    private val showInviteCard = preferences.nextSessionShowsInvite()
+    private var inviteShown = false
+    private var goalReached = false
 
     private val onboardingApi = OnboardingApi()
 
@@ -224,6 +242,44 @@ class FeedViewModel(private val authSession: AuthSession) : ViewModel() {
         }
     }
 
+    // Counts a card toward the session recap the moment it's scrolled to,
+    // deliberately independent of the 4.5s server-clock read gate: "I scrolled
+    // past this" and "the server counted it as read" are different questions,
+    // and the recap copy is about the former. Keyed by cardId rather than
+    // occurrence so a recirculated repeat doesn't inflate the count twice.
+    fun markSessionView(card: FeedCard) {
+        if (!viewedCardIds.add(card.id)) return
+        _sessionViews.value = viewedCardIds.size
+        addSessionCategory(card.category.name)
+    }
+
+    // Also called after a challenge answer: those count toward the session's
+    // topic tally even though they aren't cards.
+    fun addSessionCategory(name: String?) {
+        if (name == null) return
+        sessionCategories.add(name)
+        _sessionTopicCount.value = sessionCategories.size
+    }
+
+    // Appends the goal-reached slide the first time the daily card-count goal
+    // is crossed this session. iOS snapshots a position and rebuilds the whole
+    // item list; this client builds items incrementally by appending, so the
+    // slide is appended at the current tail instead — the user meets it on the
+    // next swipe either way, and rebuilding would disturb the pager underneath
+    // them. FeedPreferences' own date guard keeps it to once per local day.
+    fun markGoalReachedIfNeeded(cardsToday: Int) {
+        if (goalReached) return
+        if (cardsToday < preferences.dailyCardGoal) return
+        if (!preferences.markGoalReachedIfNeededToday()) {
+            // Already celebrated today in an earlier session — don't show it
+            // again, but don't keep re-checking either.
+            goalReached = true
+            return
+        }
+        goalReached = true
+        _items.value = _items.value + FeedItem.GoalReached
+    }
+
     // Sent as `exclude` so the server doesn't resurface something already on
     // screen. Deliberately a bounded recent window rather than the full
     // accumulated history: once `exhausted` flips true and the server starts
@@ -287,6 +343,13 @@ class FeedViewModel(private val authSession: AuthSession) : ViewModel() {
             if (cardsConsumed % EXPLAIN_EVERY == EXPLAIN_OFFSET && explainCursor < explainPrompts.size) {
                 out += FeedItem.Explain(explainPrompts[explainCursor++])
             }
+            if (cardsConsumed % CHECKIN_EVERY == 0) {
+                out += FeedItem.Checkin(afterCount = cardsConsumed)
+            }
+            if (showInviteCard && !inviteShown && cardsConsumed == INVITE_AFTER_CARDS) {
+                inviteShown = true
+                out += FeedItem.Invite
+            }
         }
         flushReviewQuizzesUpTo(newCards.size)
 
@@ -332,5 +395,7 @@ class FeedViewModel(private val authSession: AuthSession) : ViewModel() {
         const val EXPLAIN_EVERY = 12
         const val EXPLAIN_OFFSET = 3
         const val EXCLUDE_WINDOW = 60
+        const val CHECKIN_EVERY = 15
+        const val INVITE_AFTER_CARDS = 12
     }
 }

@@ -106,6 +106,8 @@ commit messages, which say plainly which were exercised and how.
 | Friends: add/accept/remove | Needs a second account; only the friend code and empty state were seen. |
 | Notifications: mark all read | The button renders; the POST was never run. |
 | Sign out | `ProfileViewModel.signOut` revokes the session server-side. Verify it lands back on login and that the old token is genuinely dead. |
+| Recap slides | Check-in every 15 cards, invite at card 12 (every other app launch), goal-reached on crossing the daily card goal. |
+| Swipe hint | Only on a fresh install, before the first swipe. `adb shell pm clear com.sparklet.android` resets it — but that also signs you out. |
 
 ## Read tracking
 
