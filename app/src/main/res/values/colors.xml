@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mirrors SparkletColors.Background, the globals.css background variable. -->
+    <color name="sparklet_background">#FF0A0A0A</color>
+</resources>

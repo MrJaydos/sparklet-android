@@ -15,11 +15,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.sparklet.android.ui.theme.SparkletColors
+import com.sparklet.android.ui.theme.categoryColor
 import com.sparklet.android.model.FeedCard
 
 // Each card fills exactly one pager page (see FeedScreen's VerticalPager),
@@ -33,7 +34,11 @@ fun CardView(card: FeedCard) {
         Row {
             Text(card.category.icon)
             Spacer(modifier = Modifier.padding(start = 4.dp))
-            Text(card.category.name, style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+            Text(
+                card.category.name,
+                style = MaterialTheme.typography.labelMedium,
+                color = categoryColor(card.category.colorHex),
+            )
         }
 
         Spacer(modifier = Modifier.padding(top = 8.dp))
@@ -46,14 +51,14 @@ fun CardView(card: FeedCard) {
                     .fillMaxWidth()
                     .height(180.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.LightGray),
+                    .background(SparkletColors.PanelAlt),
             )
             Spacer(modifier = Modifier.padding(top = 8.dp))
         }
 
         Text(card.title, style = MaterialTheme.typography.headlineSmall)
         Spacer(modifier = Modifier.padding(top = 8.dp))
-        Text(card.body, style = MaterialTheme.typography.bodyLarge, color = Color.DarkGray)
+        Text(card.body, style = MaterialTheme.typography.bodyLarge, color = SparkletColors.TextSecondary)
 
         card.sources.firstOrNull()?.let { source ->
             Spacer(modifier = Modifier.padding(top = 8.dp))
@@ -61,6 +66,7 @@ fun CardView(card: FeedCard) {
             Text(
                 source.publisher,
                 style = MaterialTheme.typography.labelSmall.copy(textDecoration = TextDecoration.Underline),
+                color = SparkletColors.TextMuted,
                 modifier = Modifier.clickable { uriHandler.openUri(source.url) },
             )
         }

@@ -15,9 +15,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.sparklet.android.ui.theme.SparkletColors
 
 // Deliberately holds no sign-in state of its own and starts no coroutine.
 // Everything it shows is derived from AuthSession.signInState, so the flow
@@ -53,7 +53,7 @@ fun LoginScreen(authSession: AuthSession) {
         }
 
         (signInState as? AuthSession.SignInState.Failed)?.let { failed ->
-            Text(failed.message, color = Color.Red, style = MaterialTheme.typography.bodySmall)
+            Text(failed.message, color = SparkletColors.DangerText, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.sparklet.android.ui.theme.SparkletColors
 import com.sparklet.android.model.FeedMisconception
 import com.sparklet.android.model.MisconceptionAnswerResponse
 import com.sparklet.android.model.XpSummary
@@ -75,7 +76,7 @@ fun MisconceptionAnswerView(
                 Button(
                     onClick = { lockIn(true) },
                     enabled = !locked,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                    colors = ButtonDefaults.buttonColors(containerColor = SparkletColors.Success),
                     modifier = Modifier.weight(1f).padding(end = 8.dp),
                 ) {
                     Text(if (locked && pickedGuess == true) "…" else "TRUE")
@@ -83,7 +84,7 @@ fun MisconceptionAnswerView(
                 Button(
                     onClick = { lockIn(false) },
                     enabled = !locked,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
+                    colors = ButtonDefaults.buttonColors(containerColor = SparkletColors.Danger),
                     modifier = Modifier.weight(1f).padding(start = 8.dp),
                 ) {
                     Text(if (locked && pickedGuess == false) "…" else "FALSE")

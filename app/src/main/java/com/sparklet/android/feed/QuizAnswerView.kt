@@ -22,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.sparklet.android.ui.theme.SparkletColors
+import com.sparklet.android.ui.theme.categoryColor
 import com.sparklet.android.model.Category
 import com.sparklet.android.model.QuizAnswerResponse
 import com.sparklet.android.model.XpSummary
@@ -102,7 +104,7 @@ fun QuizAnswerView(
         Text(
             if (variant == QuizVariant.REVIEW) "🔁 Review — do you remember?" else "🧠 Quick recall · ${category.name}",
             style = MaterialTheme.typography.labelMedium,
-            color = Color(android.graphics.Color.parseColor(category.colorHex)),
+            color = categoryColor(category.colorHex),
         )
         Text(
             question,
@@ -113,15 +115,15 @@ fun QuizAnswerView(
         options.forEachIndexed { index, option ->
             val current = result
             val background = when {
-                current != null && index == current.correctIndex -> Color(0xFF1B5E20)
-                current != null && index == picked -> Color(0xFFB71C1C)
-                current != null -> Color(0xFF303030)
-                index == picked -> Color(0xFF4527A0)
-                else -> Color(0xFF212121)
+                current != null && index == current.correctIndex -> SparkletColors.Success
+                current != null && index == picked -> SparkletColors.Danger
+                current != null -> SparkletColors.PanelAlt
+                index == picked -> SparkletColors.Accent
+                else -> SparkletColors.Panel
             }
             Text(
                 option,
-                color = Color.White,
+                color = SparkletColors.TextPrimary,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -157,7 +159,7 @@ fun XpRewardText(xp: XpSummary, combo: Int, multiplier: Double) {
     Text(
         "+${xp.awarded} XP$comboText",
         style = MaterialTheme.typography.labelLarge,
-        color = Color(0xFFFFC107),
+        color = SparkletColors.AccentText,
         modifier = Modifier.padding(top = 8.dp),
     )
 }

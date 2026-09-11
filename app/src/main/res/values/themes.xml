@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+The Activity window theme, distinct from the Compose theme in
+ui/theme/Theme.kt. It exists mainly so the window background matches the
+app's dark background (#0a0a0a, globals.css) from the very first frame —
+with a Light parent, launching the app flashed white before Compose drew.
+-->
+<resources>
+    <style name="Theme.Sparklet" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/sparklet_background</item>
+        <item name="android:statusBarColor">@color/sparklet_background</item>
+        <item name="android:navigationBarColor">@color/sparklet_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>
