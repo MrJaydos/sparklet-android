@@ -83,6 +83,8 @@ fun FeedScreen(authSession: AuthSession) {
     var showingProfile by remember { mutableStateOf(false) }
     var showingFriends by remember { mutableStateOf(false) }
     var showingMap by remember { mutableStateOf(false) }
+    var commentsCardId by remember { mutableStateOf<String?>(null) }
+    var reportCardId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.loadIfNeeded()
@@ -178,7 +180,12 @@ fun FeedScreen(authSession: AuthSession) {
                     key = { index -> items.getOrNull(index)?.pagerKey ?: index },
                 ) { page ->
                     when (val item = items[page]) {
-                        is FeedItem.Card -> CardView(card = item.card)
+                        is FeedItem.Card -> CardView(
+                            card = item.card,
+                            token = token,
+                            onOpenComments = { commentsCardId = item.card.id },
+                            onOpenReport = { reportCardId = item.card.id },
+                        )
                         is FeedItem.Quiz -> QuizAnswerView(
                             id = item.quiz.id,
                             question = item.quiz.question,
@@ -275,6 +282,26 @@ fun FeedScreen(authSession: AuthSession) {
             containerColor = SparkletColors.Background,
         ) {
             KnowledgeMapScreen(mapViewModel)
+        }
+    }
+
+    commentsCardId?.let { cardId ->
+        ModalBottomSheet(
+            onDismissRequest = { commentsCardId = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = SparkletColors.Background,
+        ) {
+            CommentsSheet(cardId = cardId, token = token)
+        }
+    }
+
+    reportCardId?.let { cardId ->
+        ModalBottomSheet(
+            onDismissRequest = { reportCardId = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = SparkletColors.Background,
+        ) {
+            ReportSheet(cardId = cardId, token = token, onDone = { reportCardId = null })
         }
     }
 

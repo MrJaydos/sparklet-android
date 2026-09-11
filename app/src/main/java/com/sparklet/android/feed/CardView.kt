@@ -29,7 +29,12 @@ import com.sparklet.android.model.FeedCard
 // rather than scrollable within its page — same known layout gap iOS's
 // CardView documents (a nested scroll fights the pager's own drag gesture).
 @Composable
-fun CardView(card: FeedCard) {
+fun CardView(
+    card: FeedCard,
+    token: String?,
+    onOpenComments: () -> Unit,
+    onOpenReport: () -> Unit,
+) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Row {
             Text(card.category.icon)
@@ -59,6 +64,13 @@ fun CardView(card: FeedCard) {
         Text(card.title, style = MaterialTheme.typography.headlineSmall)
         Spacer(modifier = Modifier.padding(top = 8.dp))
         Text(card.body, style = MaterialTheme.typography.bodyLarge, color = SparkletColors.TextSecondary)
+
+        CardActionsRail(
+            card = card,
+            token = token,
+            onOpenComments = onOpenComments,
+            onOpenReport = onOpenReport,
+        )
 
         card.sources.firstOrNull()?.let { source ->
             Spacer(modifier = Modifier.padding(top = 8.dp))
