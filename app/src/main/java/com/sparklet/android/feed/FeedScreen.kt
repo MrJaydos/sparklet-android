@@ -151,7 +151,11 @@ fun FeedScreen(authSession: AuthSession) {
                     if (xp != null) {
                         statsViewModel.apply(xp)
                         viewModel.markGoalReachedIfNeeded(
-                            statsViewModel.profile.value?.cardsToday ?: 0
+                            cardsToday = statsViewModel.profile.value?.cardsToday ?: 0,
+                            // Read fresh rather than captured: trackView
+                            // suspends ~4.7s before this runs, and the user
+                            // may have swiped on in the meantime.
+                            afterIndex = pagerState.settledPage,
                         )
                     }
                 }

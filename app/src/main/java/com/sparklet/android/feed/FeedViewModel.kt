@@ -261,13 +261,17 @@ class FeedViewModel(
         _sessionTopicCount.value = sessionCategories.size
     }
 
-    // Appends the goal-reached slide the first time the daily card-count goal
-    // is crossed this session. iOS snapshots a position and rebuilds the whole
-    // item list; this client builds items incrementally by appending, so the
-    // slide is appended at the current tail instead — the user meets it on the
-    // next swipe either way, and rebuilding would disturb the pager underneath
-    // them. FeedPreferences' own date guard keeps it to once per local day.
-    fun markGoalReachedIfNeeded(cardsToday: Int) {
+    // Inserts the goal-reached slide the first time the daily card-count goal
+    // is crossed this session, directly after the card the user is on so they
+    // meet it on the very next swipe — a congratulation that arrives a dozen
+    // cards later isn't one.
+    //
+    // iOS snapshots a position and rebuilds the whole item list; this client
+    // builds items incrementally, so it splices instead, which leaves every
+    // already-composed page before the insertion point untouched and can't
+    // disturb the pager under the user. FeedPreferences' own date guard keeps
+    // it to once per local day.
+    fun markGoalReachedIfNeeded(cardsToday: Int, afterIndex: Int) {
         if (goalReached) return
         if (cardsToday < preferences.dailyCardGoal) return
         if (!preferences.markGoalReachedIfNeededToday()) {
@@ -277,7 +281,12 @@ class FeedViewModel(
             return
         }
         goalReached = true
-        _items.value = _items.value + FeedItem.GoalReached
+        val current = _items.value
+        // coerceIn guards a settled index that's already been invalidated by a
+        // concurrent refresh — appending is the safe fallback, never a crash.
+        val insertAt = (afterIndex + 1).coerceIn(0, current.size)
+        _items.value = current.subList(0, insertAt) + FeedItem.GoalReached +
+            current.subList(insertAt, current.size)
     }
 
     // Sent as `exclude` so the server doesn't resurface something already on
