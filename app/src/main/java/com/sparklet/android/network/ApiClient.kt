@@ -83,6 +83,17 @@ object ApiClient {
         return decode(execute(builder.build()))
     }
 
+    // PATCH with no body and no decoded response — the friends accept route
+    // takes neither. OkHttp still requires a body object for PATCH, hence the
+    // empty one.
+    suspend fun patchDiscardingResponse(path: String, token: String?) {
+        val builder = Request.Builder()
+            .url(AppConfig.apiBaseUrl.newBuilder().addPathSegments(path).build())
+            .patch(ByteArray(0).toRequestBody(null, 0, 0))
+        token?.let { builder.header("Authorization", "Bearer $it") }
+        execute(builder.build())
+    }
+
     // No caller needs the `{ ok: true }` body back — avoids the awkward
     // "decode into a type I'm discarding" shape a generic delete<T> forces.
     suspend fun delete(path: String, token: String?) {

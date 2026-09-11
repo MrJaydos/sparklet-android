@@ -30,6 +30,10 @@ import com.sparklet.android.auth.AuthSession
 import com.sparklet.android.model.FeedItem
 import com.sparklet.android.leaderboard.LeaderboardScreen
 import com.sparklet.android.leaderboard.LeaderboardViewModel
+import com.sparklet.android.friends.FriendsScreen
+import com.sparklet.android.friends.FriendsViewModel
+import com.sparklet.android.map.KnowledgeMapScreen
+import com.sparklet.android.map.KnowledgeMapViewModel
 import com.sparklet.android.model.pagerKey
 import com.sparklet.android.notifications.NotificationsScreen
 import com.sparklet.android.notifications.NotificationsViewModel
@@ -77,6 +81,8 @@ fun FeedScreen(authSession: AuthSession) {
     var showingLeaderboard by remember { mutableStateOf(false) }
     var showingNotifications by remember { mutableStateOf(false) }
     var showingProfile by remember { mutableStateOf(false) }
+    var showingFriends by remember { mutableStateOf(false) }
+    var showingMap by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.loadIfNeeded()
@@ -145,6 +151,8 @@ fun FeedScreen(authSession: AuthSession) {
             onOpenLeaderboard = { showingLeaderboard = true },
             onOpenNotifications = { showingNotifications = true },
             onOpenProfile = { showingProfile = true },
+            onOpenFriends = { showingFriends = true },
+            onOpenMap = { showingMap = true },
         )
 
         PullToRefreshBox(
@@ -245,6 +253,28 @@ fun FeedScreen(authSession: AuthSession) {
             containerColor = SparkletColors.Background,
         ) {
             ProfileScreen(profileViewModel)
+        }
+    }
+
+    if (showingFriends) {
+        val friendsViewModel = viewModel { FriendsViewModel(authSession) }
+        ModalBottomSheet(
+            onDismissRequest = { showingFriends = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = SparkletColors.Background,
+        ) {
+            FriendsScreen(friendsViewModel)
+        }
+    }
+
+    if (showingMap) {
+        val mapViewModel = viewModel { KnowledgeMapViewModel(authSession) }
+        ModalBottomSheet(
+            onDismissRequest = { showingMap = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = SparkletColors.Background,
+        ) {
+            KnowledgeMapScreen(mapViewModel)
         }
     }
 

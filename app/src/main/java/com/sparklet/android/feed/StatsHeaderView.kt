@@ -29,6 +29,8 @@ fun StatsHeaderView(
     onOpenLeaderboard: () -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenProfile: () -> Unit,
+    onOpenFriends: () -> Unit,
+    onOpenMap: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -55,6 +57,8 @@ fun StatsHeaderView(
 
         Spacer(modifier = Modifier.weight(1f))
 
+        HeaderAction("🗺️", onOpenMap)
+        HeaderAction("👥", onOpenFriends)
         HeaderAction("🏆", onOpenLeaderboard)
         HeaderAction("🔔", onOpenNotifications)
         HeaderAction("👤", onOpenProfile)
