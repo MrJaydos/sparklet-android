@@ -70,6 +70,19 @@ object ApiClient {
         return decode(execute(builder.build()))
     }
 
+    suspend inline fun <reified B, reified T> patch(
+        path: String,
+        body: B,
+        token: String?,
+    ): T {
+        val requestBody = json.encodeToString(body).toRequestBody("application/json".toMediaType())
+        val builder = Request.Builder()
+            .url(AppConfig.apiBaseUrl.newBuilder().addPathSegments(path).build())
+            .patch(requestBody)
+        token?.let { builder.header("Authorization", "Bearer $it") }
+        return decode(execute(builder.build()))
+    }
+
     // No caller needs the `{ ok: true }` body back — avoids the awkward
     // "decode into a type I'm discarding" shape a generic delete<T> forces.
     suspend fun delete(path: String, token: String?) {

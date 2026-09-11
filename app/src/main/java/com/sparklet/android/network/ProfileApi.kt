@@ -1,6 +1,8 @@
 package com.sparklet.android.network
 
+import com.sparklet.android.model.ProfileDetailsResponse
 import com.sparklet.android.model.ProfileResponse
+import kotlinx.serialization.Serializable
 
 class ProfileApi(private val client: ApiClient = ApiClient) {
 
@@ -12,6 +14,26 @@ class ProfileApi(private val client: ApiClient = ApiClient) {
         return client.get(
             "api/profile",
             query = listOf("tz" to TimeZoneOffset.minutesWestOfUtc().toString()),
+            token = token,
+        )
+    }
+
+    // A separate route from GET /api/profile: that one is polled on every
+    // feed load, while this (badges/history/notebook/top categories) is only
+    // needed when the Profile screen itself opens.
+    suspend fun fetchDetails(token: String?): ProfileDetailsResponse =
+        client.get("api/profile/details", token = token)
+
+    @Serializable
+    private data class UpdateNameRequest(val name: String)
+
+    @Serializable
+    private data class UpdateNameResponse(val ok: Boolean, val name: String? = null)
+
+    suspend fun updateName(name: String, token: String?) {
+        client.patch<UpdateNameRequest, UpdateNameResponse>(
+            path = "api/profile",
+            body = UpdateNameRequest(name),
             token = token,
         )
     }

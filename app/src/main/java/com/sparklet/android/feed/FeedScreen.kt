@@ -31,6 +31,10 @@ import com.sparklet.android.model.FeedItem
 import com.sparklet.android.leaderboard.LeaderboardScreen
 import com.sparklet.android.leaderboard.LeaderboardViewModel
 import com.sparklet.android.model.pagerKey
+import com.sparklet.android.notifications.NotificationsScreen
+import com.sparklet.android.notifications.NotificationsViewModel
+import com.sparklet.android.profile.ProfileScreen
+import com.sparklet.android.profile.ProfileViewModel
 import com.sparklet.android.ui.theme.SparkletColors
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -71,6 +75,8 @@ fun FeedScreen(authSession: AuthSession) {
     val scope = rememberCoroutineScope()
     var isRefreshing by remember { mutableStateOf(false) }
     var showingLeaderboard by remember { mutableStateOf(false) }
+    var showingNotifications by remember { mutableStateOf(false) }
+    var showingProfile by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.loadIfNeeded()
@@ -134,7 +140,12 @@ fun FeedScreen(authSession: AuthSession) {
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        StatsHeaderView(profile, onOpenLeaderboard = { showingLeaderboard = true })
+        StatsHeaderView(
+            profile = profile,
+            onOpenLeaderboard = { showingLeaderboard = true },
+            onOpenNotifications = { showingNotifications = true },
+            onOpenProfile = { showingProfile = true },
+        )
 
         PullToRefreshBox(
             isRefreshing = isRefreshing,
@@ -212,6 +223,28 @@ fun FeedScreen(authSession: AuthSession) {
             containerColor = SparkletColors.Background,
         ) {
             LeaderboardScreen(leaderboardViewModel)
+        }
+    }
+
+    if (showingNotifications) {
+        val notificationsViewModel = viewModel { NotificationsViewModel(authSession) }
+        ModalBottomSheet(
+            onDismissRequest = { showingNotifications = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = SparkletColors.Background,
+        ) {
+            NotificationsScreen(notificationsViewModel)
+        }
+    }
+
+    if (showingProfile) {
+        val profileViewModel = viewModel { ProfileViewModel(authSession) }
+        ModalBottomSheet(
+            onDismissRequest = { showingProfile = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = SparkletColors.Background,
+        ) {
+            ProfileScreen(profileViewModel)
         }
     }
 

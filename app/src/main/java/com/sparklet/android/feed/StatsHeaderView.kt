@@ -27,6 +27,8 @@ import com.sparklet.android.ui.theme.SparkletColors
 fun StatsHeaderView(
     profile: ProfileResponse?,
     onOpenLeaderboard: () -> Unit,
+    onOpenNotifications: () -> Unit,
+    onOpenProfile: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -53,12 +55,17 @@ fun StatsHeaderView(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        Text(
-            "🏆",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier
-                .clickable(onClick = onOpenLeaderboard)
-                .padding(8.dp),
-        )
+        HeaderAction("🏆", onOpenLeaderboard)
+        HeaderAction("🔔", onOpenNotifications)
+        HeaderAction("👤", onOpenProfile)
     }
+}
+
+@Composable
+private fun HeaderAction(emoji: String, onClick: () -> Unit) {
+    Text(
+        emoji,
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.clickable(onClick = onClick).padding(8.dp),
+    )
 }
