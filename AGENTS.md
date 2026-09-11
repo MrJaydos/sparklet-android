@@ -208,6 +208,24 @@ UI that matches them rather than fights them:
    code — and `sparklet-ios` hasn't finished the quiz/guess/review-answering
    surface either, so Android starts behind web on that UI, not at parity.
 
+4. **PWA sign-in detour: accepted, not fixed (2026-09-11).** On a device with
+   the Sparklet PWA installed, Chrome routes `/login` out of the Custom Tab
+   and into the WebAPK, so sign-in happens in the PWA and hands back via
+   `sparklet-android://auth` (~3.7s). It works; it is just a confusing detour
+   through a second Sparklet-branded app. **Don't "fix" this by narrowing the
+   PWA manifest `scope`.** `src/app/manifest.ts` sets no explicit scope, so it
+   defaults to the `start_url` directory — `/feed` → `/`. Narrowing it to
+   `/feed` would drop `/explore`, `/leaderboard`, `/profile`, `/map`,
+   `/notifications`, `/card/*`, `/upgrade`, `/onboarding` and `/invite/*` out
+   of standalone mode — essentially the whole app — which is a far worse
+   regression than the detour it removes. The only clean fix is serving the
+   mobile-login entry point from a host the WebAPK doesn't claim (e.g.
+   `auth.sparkletapp.com`), which costs DNS + cert + Auth.js cookie/callback
+   config + OAuth redirect-URI allowlist changes on a live backend. Judged not
+   worth it: users who installed the PWA *and* the native app are a small
+   population, and the flow completes for them anyway. Revisit only if that
+   assumption stops holding.
+
 ## Commands
 
 A Gradle wrapper **is** committed as of 2026-09-11 (generated with a

@@ -126,9 +126,10 @@ contract:
 - if the user stops at the PWA screen instead of completing sign-in there,
   returning to the app shows "Sign-in was cancelled."
 
-Worth fixing (narrowing the PWA manifest `scope`, or serving the mobile-login
-entry point from a path/host the WebAPK doesn't claim), but it does not block
-shipping or testing. It also only reproduces with the PWA installed.
+**Decision (2026-09-11): accepted as-is, not fixed.** It only reproduces with
+the PWA installed, and the flow completes. Note the obvious-looking fix is a
+trap — see decision 4 in `AGENTS.md` before reaching for the manifest
+`scope`.
 
 > An earlier revision of this file called this a hard blocker and claimed
 > `sparklet-android://` never fires. That was wrong — see `MISTAKES.md`.
