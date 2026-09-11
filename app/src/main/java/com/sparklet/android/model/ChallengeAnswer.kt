@@ -42,3 +42,12 @@ data class MisconceptionAnswerResponse(
     val multiplier: Double,
     val guest: Boolean = false,
 )
+
+// Mirrors POST /api/explain/[cardId]/answer. `score` is the grader's 0-1
+// rating of the explanation; `feedback` is its prose response.
+@Serializable
+data class ExplainAnswerResponse(
+    val score: Double,
+    val feedback: String,
+    val xp: XpSummary,
+)

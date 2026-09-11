@@ -3,6 +3,7 @@ package com.sparklet.android.feed
 import androidx.lifecycle.ViewModel
 import com.sparklet.android.auth.AuthSession
 import com.sparklet.android.model.FeedCard
+import com.sparklet.android.model.FeedExplainPrompt
 import com.sparklet.android.model.FeedGuess
 import com.sparklet.android.model.FeedItem
 import com.sparklet.android.model.FeedMisconception
@@ -44,6 +45,8 @@ class FeedViewModel(private val authSession: AuthSession) : ViewModel() {
     private var guessCursor = 0
     private var misconceptions = emptyList<FeedMisconception>()
     private var misconceptionCursor = 0
+    private var explainPrompts = emptyList<FeedExplainPrompt>()
+    private var explainCursor = 0
 
     // Running count of FeedCards folded into `items` so far, across the
     // whole session. The _EVERY pacing constants below are defined against
@@ -117,6 +120,8 @@ class FeedViewModel(private val authSession: AuthSession) : ViewModel() {
             guessCursor = 0
             misconceptions = response.misconceptions
             misconceptionCursor = 0
+            explainPrompts = response.explainPrompts
+            explainCursor = 0
             cardsConsumed = 0
             _items.value = emptyList()
             interleaveBatch(response.cards, response.reviewQuizzes)
@@ -164,6 +169,8 @@ class FeedViewModel(private val authSession: AuthSession) : ViewModel() {
             guesses = guesses + response.guesses.filter { it.id !in knownGuessIds }
             val knownMisconceptionIds = misconceptions.map { it.id }.toSet()
             misconceptions = misconceptions + response.misconceptions.filter { it.id !in knownMisconceptionIds }
+            val knownExplainIds = explainPrompts.map { it.id }.toSet()
+            explainPrompts = explainPrompts + response.explainPrompts.filter { it.id !in knownExplainIds }
             val knownReviewQuizIds =
                 _items.value.filterIsInstance<FeedItem.ReviewQuiz>().map { it.quiz.id }.toSet()
             val newReviewQuizzes = response.reviewQuizzes.filter { it.id !in knownReviewQuizIds }
@@ -212,6 +219,9 @@ class FeedViewModel(private val authSession: AuthSession) : ViewModel() {
             if (cardsConsumed % MISCONCEPTION_EVERY == MISCONCEPTION_OFFSET && misconceptionCursor < misconceptions.size) {
                 out += FeedItem.Misconception(misconceptions[misconceptionCursor++])
             }
+            if (cardsConsumed % EXPLAIN_EVERY == EXPLAIN_OFFSET && explainCursor < explainPrompts.size) {
+                out += FeedItem.Explain(explainPrompts[explainCursor++])
+            }
         }
         flushReviewQuizzesUpTo(newCards.size)
 
@@ -254,5 +264,7 @@ class FeedViewModel(private val authSession: AuthSession) : ViewModel() {
         const val GUESS_OFFSET = 1
         const val MISCONCEPTION_EVERY = 10
         const val MISCONCEPTION_OFFSET = 2
+        const val EXPLAIN_EVERY = 12
+        const val EXPLAIN_OFFSET = 3
     }
 }

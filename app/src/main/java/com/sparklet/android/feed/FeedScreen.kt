@@ -222,6 +222,12 @@ fun FeedScreen(authSession: AuthSession) {
                             onResult = { xp -> statsViewModel.apply(xp) },
                             onContinue = { advance(page) },
                         )
+                        is FeedItem.Explain -> ExplainAnswerView(
+                            prompt = item.prompt,
+                            token = token,
+                            onResult = { xp -> statsViewModel.apply(xp) },
+                            onContinue = { advance(page) },
+                        )
                         is FeedItem.Misconception -> MisconceptionAnswerView(
                             misconception = item.misconception,
                             token = token,

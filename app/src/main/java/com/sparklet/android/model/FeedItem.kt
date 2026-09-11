@@ -26,6 +26,10 @@ sealed class FeedItem {
     data class Misconception(val misconception: FeedMisconception) : FeedItem() {
         override val id = misconception.id
     }
+
+    data class Explain(val prompt: FeedExplainPrompt) : FeedItem() {
+        override val id = prompt.id
+    }
 }
 
 // Pager page key: prefixed by kind rather than the bare id, since nothing
@@ -37,4 +41,5 @@ val FeedItem.pagerKey: String
         is FeedItem.ReviewQuiz -> "reviewQuiz:$id"
         is FeedItem.Guess -> "guess:$id"
         is FeedItem.Misconception -> "misconception:$id"
+        is FeedItem.Explain -> "explain:$id"
     }
