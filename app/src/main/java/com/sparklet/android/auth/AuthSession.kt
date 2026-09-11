@@ -2,6 +2,7 @@ package com.sparklet.android.auth
 
 import android.content.Context
 import android.net.Uri
+import com.sparklet.android.network.ApiException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -93,7 +94,7 @@ class AuthSession(
                 tokenStore.save(token)
                 _signInState.value = SignInState.Idle
             } catch (e: Exception) {
-                _signInState.value = SignInState.Failed(e.message ?: "Sign-in failed.")
+                _signInState.value = SignInState.Failed(signInErrorMessage(e))
             }
         }
     }
@@ -110,6 +111,20 @@ class AuthSession(
             awaitingRedirect = false
             _signInState.value = SignInState.Failed("Sign-in was cancelled.")
         }
+    }
+
+    // ApiException's own messages are diagnostic ("unauthorized", "server
+    // error 503") and were previously shown to the user verbatim. Each case
+    // is worded for what the person was actually doing — signing in — and for
+    // what they can do next.
+    private fun signInErrorMessage(e: Throwable): String = when (e) {
+        // The one-time code is single-use and lives 60 seconds, so a 401 here
+        // means it expired or was already redeemed — not that the account is
+        // wrong. Retrying genuinely works, so say so.
+        is ApiException.Unauthorized -> "That sign-in link expired. Tap Sign in to try again."
+        is ApiException.Transport -> "Couldn't reach Sparklet. Check your connection and try again."
+        is ApiException.Server -> "Sparklet is having trouble right now. Try again in a moment."
+        else -> "Something went wrong signing in. Please try again."
     }
 
     fun clearSignInError() {
