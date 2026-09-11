@@ -1,9 +1,32 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
+
+// Which backend the client talks to. Defaults to production, which is where
+// the mobile-auth contract is actually deployed. Override it *without*
+// editing tracked source — that's the point of it living here rather than in
+// AppConfig.kt, which previously carried a hardcoded emulator-only address
+// that silently made every physical-device build unusable:
+//
+//   local.properties:  sparklet.apiBaseUrl=http://192.168.1.42:3001
+//   or one-off:        ./gradlew :app:assembleDebug -Psparklet.apiBaseUrl=...
+//
+// Emulator reaches the host machine at 10.0.2.2; a physical device needs the
+// machine's LAN IP. Debug builds permit cleartext to any host (see
+// src/debug/res/xml/network_security_config.xml) so a LAN IP needs no further
+// setup; release builds stay HTTPS-only.
+val localProperties = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}
+val sparkletApiBaseUrl: String =
+    (project.findProperty("sparklet.apiBaseUrl") as String?)
+        ?: localProperties.getProperty("sparklet.apiBaseUrl")
+        ?: "https://sparkletapp.com"
 
 android {
     namespace = "com.sparklet.android"
@@ -15,6 +38,8 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.1"
+
+        buildConfigField("String", "API_BASE_URL", "\"$sparkletApiBaseUrl\"")
     }
 
     buildTypes {
@@ -34,6 +59,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

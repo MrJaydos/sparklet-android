@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Debug builds only — this file replaces the main-sourceSet config of the same
+name when building the debug variant, and is never part of a release APK.
+
+It permits cleartext HTTP to any host so that pointing the app at a local
+`sparklet` dev server (see app/build.gradle.kts's sparklet.apiBaseUrl) works
+from an emulator (10.0.2.2) or a physical device (your machine's LAN IP)
+without having to hand-edit an allowlist for whatever IP the machine got from
+DHCP today. Release builds keep the strict main config, which is HTTPS-only.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
