@@ -80,6 +80,13 @@ class CardActionsApi(private val client: ApiClient = ApiClient) {
     // Throws ApiException.Server(402) when the level is premium-gated and the
     // caller isn't subscribed — callers must handle that rather than treating
     // it as a generic failure.
+    //
+    // Needs a much longer timeout than everything else here. The route returns
+    // a pre-generated variant instantly when the card has one, but otherwise
+    // generates it inline with an LLM call, which routinely outruns OkHttp's
+    // 10s default read timeout. Left at the default this silently failed for
+    // every card without a cached variant — and since cached ones answered
+    // immediately, it looked like depth switching worked.
     suspend fun fetchDepth(cardId: String, level: DepthLevel, token: String?): DepthCardResponse =
-        client.post("api/cards/$cardId/depth", DepthRequest(level), token)
+        client.post("api/cards/$cardId/depth", DepthRequest(level), token, timeoutSeconds = 90)
 }

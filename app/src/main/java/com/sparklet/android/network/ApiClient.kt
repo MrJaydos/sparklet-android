@@ -2,6 +2,7 @@ package com.sparklet.android.network
 
 import com.sparklet.android.config.AppConfig
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
@@ -57,17 +58,22 @@ object ApiClient {
         return decode(execute(builder.build()))
     }
 
+    // `timeoutSeconds` overrides OkHttp's 10s default read timeout for a
+    // single call. Needed because some routes do LLM generation inline and
+    // legitimately take far longer than any normal request should — see
+    // CardActionsApi.fetchDepth.
     suspend inline fun <reified B, reified T> post(
         path: String,
         body: B,
         token: String?,
+        timeoutSeconds: Long? = null,
     ): T {
         val requestBody = json.encodeToString(body).toRequestBody("application/json".toMediaType())
         val builder = Request.Builder()
             .url(AppConfig.apiBaseUrl.newBuilder().addPathSegments(path).build())
             .post(requestBody)
         token?.let { builder.header("Authorization", "Bearer $it") }
-        return decode(execute(builder.build()))
+        return decode(execute(builder.build(), timeoutSeconds))
     }
 
     suspend inline fun <reified B, reified T> patch(
@@ -115,9 +121,16 @@ object ApiClient {
     // a response was large enough to need a read past OkHttp's initial
     // buffered chunk — small responses (e.g. /api/profile) happened to be
     // fully readable from that buffer and never touched the socket here.
-    suspend fun execute(request: Request): String = withContext(Dispatchers.IO) {
+    suspend fun execute(request: Request, timeoutSeconds: Long? = null): String = withContext(Dispatchers.IO) {
+        // newBuilder() shares the connection pool and dispatcher with the base
+        // client, so a per-call timeout costs nothing — it's the documented
+        // way to vary one setting for a single request rather than loosening
+        // the default for every call and hiding real hangs.
+        val callClient = timeoutSeconds
+            ?.let { client.newBuilder().readTimeout(it, TimeUnit.SECONDS).build() }
+            ?: client
         val response = try {
-            client.newCall(request).execute()
+            callClient.newCall(request).execute()
         } catch (e: IOException) {
             throw ApiException.Transport(e)
         }
