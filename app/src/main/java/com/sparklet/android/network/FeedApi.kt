@@ -6,9 +6,13 @@ import kotlinx.serialization.Serializable
 
 // Mirrors POST /api/interactions's body (sparklet/src/app/api/interactions/route.ts).
 @Serializable
+// `action` deliberately carries no default: the backend's zod schema requires
+// it, and a default here is exactly what made it vanish from the wire once
+// (see ApiClient.json). Passing it explicitly at the call site keeps the
+// requirement visible rather than resting on serializer configuration.
 private data class InteractionRequest(
     val cardId: String,
-    val action: String = "view",
+    val action: String,
     val tzOffsetMinutes: Int,
     val dwellMs: Int? = null,
 )
@@ -44,6 +48,7 @@ class FeedApi(private val client: ApiClient = ApiClient) {
     ): InteractionResponse {
         val body = InteractionRequest(
             cardId = cardId,
+            action = "view",
             tzOffsetMinutes = TimeZoneOffset.minutesWestOfUtc(),
             dwellMs = dwellMs,
         )

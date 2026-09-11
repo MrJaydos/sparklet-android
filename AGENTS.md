@@ -226,6 +226,17 @@ UI that matches them rather than fights them:
    population, and the flow completes for them anyway. Revisit only if that
    assumption stops holding.
 
+5. **JSON bodies must survive kotlinx.serialization's defaults (2026-09-11).**
+   `ApiClient.json` sets `encodeDefaults = true` and `explicitNulls = false`,
+   and both are load-bearing against the backend's zod schemas — don't
+   "simplify" them away. Defaults-omitted silently stripped the required
+   `action` field from every `/api/interactions` body, and explicit nulls are
+   rejected by `.optional()` (which accepts `undefined`, not `null`). Because
+   `trackView` is best-effort by design, both failure modes are invisible:
+   the client looks healthy while earning zero XP. When adding a request
+   model, check the route's zod schema for which fields are required and
+   whether optionals tolerate null.
+
 ## Commands
 
 A Gradle wrapper **is** committed as of 2026-09-11 (generated with a

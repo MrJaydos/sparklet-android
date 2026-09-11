@@ -22,7 +22,9 @@ quiz/guess/misconception/review answering (`QuizAnswerView.kt`,
 is ahead of `sparklet-ios`, which still hasn't built that surface).
 
 Sign-in, feed, stats header and challenge cards are all confirmed working
-end-to-end against production on-device. One rough edge: with the Sparklet PWA
+end-to-end against production on-device. **Read tracking was completely broken
+until 2026-09-11** — two independent bugs, both silent, both now fixed and
+verified on-device by watching XP increment (see "Read tracking" below). One rough edge: with the Sparklet PWA
 installed, Chrome routes sign-in through the PWA rather than the Custom Tab —
 it completes, but the detour is confusing. See "Testing sign-in" below.
 
@@ -83,6 +85,44 @@ Debug builds permit cleartext HTTP to any host
 extra allowlisting. Release builds keep the strict HTTPS-only config in
 `app/src/main/res/xml/`. Use the port from the `sparklet` repo's
 `npm run dev` (`PORT=3001`).
+
+## Read tracking
+
+The core loop — a card counts as read only after two `/api/interactions`
+POSTs ≥4.5s apart by the server's clock — was **awarding nothing at all**
+until 2026-09-11, while looking completely healthy from the client. Two
+separate bugs, each silent:
+
+1. **The `action` field never reached the wire.** `InteractionRequest`
+   declared `action: String = "view"`, and kotlinx.serialization omits any
+   property equal to its default unless `encodeDefaults` is set — which
+   `ApiClient.json` did not set. The backend's zod schema requires `action`,
+   so every POST 400'd, and `FeedViewModel.trackView` swallows all exceptions
+   into `null` by design ("a missed read ping costs this card's XP, nothing
+   else"). Result: zero XP, no streak, no spaced-repetition recall, no demand
+   signal — with no error anywhere.
+
+   Fixed by setting `encodeDefaults = true` **and** `explicitNulls = false`.
+   The second half is not optional: with `encodeDefaults` alone, a null
+   `dwellMs` serialises as `"dwellMs": null`, and zod's `.optional()` accepts
+   `undefined` but *rejects* an explicit null — which would have 400'd the
+   entry POST instead. `action` also no longer has a default, so the
+   requirement is visible at the call site rather than resting on serializer
+   config.
+
+2. **The first card of every session was never tracked.** `FeedScreen`
+   watched `snapshotFlow { pagerState.settledPage }`, which emits `0` at first
+   composition while `items` is still empty; `getOrNull(0)` returned null, and
+   `distinctUntilChanged()` then suppressed the page-0 re-emission once the
+   batch arrived. Card 1 silently earned nothing, every session. Now the flow
+   combines with `viewModel.items` and de-duplicates on item identity
+   (`distinctUntilChangedBy { it.pagerKey }`), which also preserves the
+   original guard against a pagination append re-firing a redundant POST pair.
+
+Verified on-device: first card now tracks with no swipe
+(`awarded=1, today=17`), each subsequent card tracks exactly once with no
+duplicate card ids, and XP increments 17 → 18 → 19 → 21 across swipes.
+
 
 ## Testing sign-in
 

@@ -27,7 +27,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sparklet.android.auth.AuthSession
 import com.sparklet.android.model.FeedItem
 import com.sparklet.android.model.pagerKey
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 
 // Paged, one-item-at-a-time scroll: pagerState.settledPage tracks whichever
@@ -68,19 +71,28 @@ fun FeedScreen(authSession: AuthSession) {
         statsViewModel.load()
     }
 
-    // Keyed on Unit, not items.size: restarting this on every pagination
-    // append would tear down and recreate the collector, and snapshotFlow
-    // re-emits the *current* settledPage as soon as a new collector starts —
-    // firing a second, redundant interaction POST pair for the item the user
-    // is already sitting on every time a new batch loads in. Reading
-    // viewModel.items.value fresh inside the collector (instead of closing
-    // over the composable's `items` snapshot) keeps this correct without
-    // needing the restart.
+    // Tracks the settled *item*, not the settled page index. Watching the
+    // index alone silently lost the first card of every session: at first
+    // composition `items` is still empty, so settledPage emits 0, getOrNull(0)
+    // returns null, and distinctUntilChanged() then swallows the page-0
+    // re-emission once the batch actually arrives — page 0 was never tracked
+    // and card 1 earned nothing, every session.
+    //
+    // Combining with viewModel.items fixes that (the list arriving is itself
+    // an emission) while distinctUntilChangedBy { pagerKey } preserves what
+    // the index-based version was protecting against: a pagination append
+    // re-emits the list, but the settled item is unchanged, so it does not
+    // fire a second redundant interaction POST pair for the card the user is
+    // already sitting on. Keyed on Unit so the collector is never torn down
+    // and recreated mid-session.
     LaunchedEffect(Unit) {
-        snapshotFlow { pagerState.settledPage }
-            .distinctUntilChanged()
-            .collect { page ->
-                val item = viewModel.items.value.getOrNull(page) ?: return@collect
+        combine(
+            snapshotFlow { pagerState.settledPage },
+            viewModel.items,
+        ) { page, list -> list.getOrNull(page) }
+            .filterNotNull()
+            .distinctUntilChangedBy { it.pagerKey }
+            .collect { item ->
                 if (item is FeedItem.Card) {
                     val xp = viewModel.trackView(item.card.id)
                     if (xp != null) statsViewModel.apply(xp)

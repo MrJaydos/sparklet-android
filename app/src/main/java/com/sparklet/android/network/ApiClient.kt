@@ -23,8 +23,27 @@ object ApiClient {
     // `private val` here would be invisible from there and fail to compile.
     // @PublishedApi internal is Kotlin's documented escape hatch: real
     // visibility stays module-internal, but inline call sites can still see it.
+    // encodeDefaults/explicitNulls are load-bearing, not style. kotlinx
+    // .serialization omits a property equal to its default value unless
+    // encodeDefaults is on, which silently dropped `action: String = "view"`
+    // from every /api/interactions body — the field the backend's zod schema
+    // requires (interactions/route.ts). The result was a 400 on every read
+    // ping, swallowed by FeedViewModel.trackView's best-effort catch, so read
+    // tracking earned zero XP, advanced no streak and fed no demand signal
+    // while looking completely healthy from the client.
+    //
+    // explicitNulls = false is the necessary other half: with encodeDefaults
+    // on and explicitNulls left at its default, a null `dwellMs` would be
+    // written as `"dwellMs": null`, and zod's `.optional()` accepts `undefined`
+    // but *rejects* an explicit null — which would 400 the entry-view POST
+    // instead. Omitting nulls keeps optional-means-absent, matching the
+    // schemas on the other side.
     @PublishedApi
-    internal val json = Json { ignoreUnknownKeys = true }
+    internal val json = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+        explicitNulls = false
+    }
 
     suspend inline fun <reified T> get(
         path: String,
