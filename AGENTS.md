@@ -264,6 +264,28 @@ UI that matches them rather than fights them:
    sign-in state and starts no coroutine — it renders
    `AuthSession.signInState`.
 
+7. **Ads and billing are blocked on inputs, not effort (2026-09-12).** These
+   are the only two `sparklet-ios` surfaces not ported, and neither is a
+   porting job:
+
+   - **Billing.** The backend has `/api/billing/apple/verify` plus Stripe
+     (`checkout`/`portal`/`webhook`) and **no Google Play route at all** —
+     grep for `androidpublisher` in the `sparklet` repo and you get nothing.
+     Android can't verify a purchase against a backend that has no endpoint
+     to verify it with, so this needs a `/api/billing/google/verify` that
+     validates a Play purchase token via the Play Developer API, plus Play
+     Console products and a service account. Server work first, client
+     second. Do not ship a client-trusted "premium = true" in the meantime.
+   - **Ads.** iOS uses Google Mobile Ads with UMP consent and ATT. The
+     Android equivalent needs its own AdMob app ID and ad unit IDs (they are
+     per-platform, so the iOS ones can't be reused) and a UMP consent flow —
+     the EEA/UK consent gathering is a legal requirement, not polish. It also
+     depends on premium state to know whether to show ads at all, so it is
+     gated behind billing above.
+
+   Both are deliberately absent rather than stubbed: a stub here would either
+   misreport entitlement or show unconsented ads.
+
 ## Commands
 
 A Gradle wrapper **is** committed as of 2026-09-11 (generated with a
