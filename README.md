@@ -88,27 +88,32 @@ extra allowlisting. Release builds keep the strict HTTPS-only config in
 
 ## Needs on-device verification
 
-Everything below builds and (where noted) is unit-tested, but has never been
-run on a device. Listed with how to actually reach it, because several are
-awkward to trigger on demand. Verified features are not listed — see the
-commit messages, which say plainly which were exercised and how.
+Nearly everything ported from `sparklet-ios` was exercised against production
+on a Galaxy Z Flip 7 on 2026-09-12. Two things remain untested, both because
+they need a second account rather than because they're hard:
 
-| Feature | How to reach it |
-| --- | --- |
-| Explain-back prompt | Swipe ~12 cards; they interleave at `EXPLAIN_EVERY = 12`, offset 3. Check submit (10-600 chars) and Skip, which must also POST. |
-| Onboarding | Only shows when `/api/profile` returns `needsOnboarding: true`, i.e. a brand-new account. Easiest with a second account. |
-| Invite deep link | `adb shell am start -a android.intent.action.VIEW -d "https://sparkletapp.com/invite/<refId>"`. Expect a chooser rather than a direct open until an `assetlinks.json` for this package is served from the domain. |
-| Depth switching | Chips under any card body. `EXTRA_DEEP` should 402 without premium and show "That depth is part of premium." A remembered depth should auto-apply to later cards. |
-| Endless feed | Swipe well past one lap of content — previously it stopped appending. Watch for a crash from duplicate pager keys if the `occurrence` fix regresses. |
-| Save (bookmark) | The rail's tag icon; confirm it appears in Profile → Notebook. |
-| Post a comment | Only the empty state and load were exercised, not an actual post. |
-| Submit a report | The sheet renders; submitting was never run. A second report of the same card should say "already reported". |
-| Friends: add/accept/remove | Needs a second account; only the friend code and empty state were seen. |
-| Notifications: mark all read | The button renders; the POST was never run. |
-| Sign out | `ProfileViewModel.signOut` revokes the session server-side. Verify it lands back on login and that the old token is genuinely dead. |
-| Recap slides | Check-in every 15 cards, invite at card 12 (every other app launch), goal-reached on crossing the daily card goal. |
-| Card detail | Tap a related link under a card. Following a related link from inside the sheet should re-target the same sheet, not stack another. |
-| Swipe hint | Only on a fresh install, before the first swipe. `adb shell pm clear com.sparklet.android` resets it — but that also signs you out. |
+| Feature | Why not tested | How to test it |
+| --- | --- | --- |
+| Onboarding | Only shows when `/api/profile` returns `needsOnboarding: true`, i.e. an account that has never onboarded. | Sign in as a fresh account. |
+| Friends: add / accept / remove | Needs someone on the other end. Friend code and empty state were verified; the request lifecycle was not. | Send a request between two accounts. |
+
+Also unexercised, and blocked rather than skipped: ads and billing — see
+decision 7 in `AGENTS.md`.
+
+### What the 2026-09-12 pass actually found
+
+Testing was not a formality; it caught two real bugs and one wrong claim.
+
+- **Depth switching was broken for most cards.** `POST /api/cards/[id]/depth`
+  generates an uncached variant inline with an LLM call, measured at 8.2s
+  on-device, against OkHttp's 10s default read timeout. Cards with a cached
+  variant answered instantly, so the feature looked like it worked. Fixed with
+  a per-call timeout.
+- **The goal-reached slide arrived far too late.** It was appended at the tail
+  of the loaded list — a dozen or more swipes from the card that earned it.
+  Now spliced directly after that card.
+- A commit message claimed the user would meet that slide "on the next swipe
+  either way". That was wrong, and only running it showed as much.
 
 ## Read tracking
 
