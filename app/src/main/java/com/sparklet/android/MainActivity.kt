@@ -6,7 +6,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import com.sparklet.android.auth.AuthRedirect
 import com.sparklet.android.auth.LoginScreen
 import com.sparklet.android.config.AppConfig
 import com.sparklet.android.feed.FeedScreen
@@ -17,6 +16,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Also handles the case where the redirect is what started this
+        // process at all — after a background kill there is no running
+        // sign-in to resume, just a valid code to redeem. AuthSession takes
+        // it from here regardless.
         handleAuthRedirect(intent)
 
         setContent {
@@ -31,30 +34,29 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Fired when the sparklet-android://auth?code=... redirect arrives
-    // while this Activity is already running — guaranteed by launchMode=
-    // singleTask in the manifest, which is what keeps the in-flight sign-in
-    // state (AuthRedirect.beginAwaiting()) alive instead of a fresh Activity
-    // instance replacing it.
+    // Fired when the sparklet-android://auth?code=... redirect arrives while
+    // this Activity is already running — guaranteed by launchMode=singleTask
+    // in the manifest, which keeps the redirect on this task rather than
+    // spawning a second Activity instance.
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         handleAuthRedirect(intent)
     }
 
-    // See AuthRedirect's comment: this only signals "cancelled" if a
-    // redirect was being awaited and onNewIntent didn't just handle it —
-    // onNewIntent always runs before onResume when the OS delivers the
-    // redirect intent, so ordering here is safe.
+    // Only signals "cancelled" if a redirect was still expected and neither
+    // onCreate nor onNewIntent just handled one — both run before onResume
+    // when the OS delivers the redirect, so the ordering is safe. See
+    // AuthSession.onActivityResumed.
     override fun onResume() {
         super.onResume()
-        AuthRedirect.onActivityResumed()
+        authSession.onActivityResumed()
     }
 
     private fun handleAuthRedirect(intent: Intent) {
         val uri = intent.data ?: return
         if (uri.scheme == AppConfig.AUTH_CALLBACK_SCHEME) {
-            AuthRedirect.onRedirect(uri)
+            authSession.onAuthRedirect(uri)
         }
     }
 }

@@ -137,6 +137,11 @@ Exercised against production from a real device (Samsung Galaxy Z Flip 7,
   resolve-activity` confirms no other app claims it).
 - The cancellation path works: returning to the app without a redirect shows
   "Sign-in was cancelled." rather than hanging.
+- The redirect survives the Activity — and the process — being destroyed
+  mid-sign-in (see decision 6 in `AGENTS.md`). Cold-starting the app directly
+  from a `sparklet-android://auth?code=…` Intent, with no sign-in in flight,
+  attempts the exchange and surfaces the result; it used to drop the code
+  silently, which a fold or unfold on this device was enough to trigger.
 
 **Sign-in works end-to-end**, confirmed 2026-09-11: token persisted to
 `files/datastore/auth.preferences_pb`, stats header live (streak + XP), feed

@@ -11,26 +11,25 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
 
+// Deliberately holds no sign-in state of its own and starts no coroutine.
+// Everything it shows is derived from AuthSession.signInState, so the flow
+// survives this composable being torn down and rebuilt mid-sign-in — which
+// is routine, since sign-in leaves the app for a Custom Tab and a fold,
+// rotation or low-memory kill while out there recreates the Activity. See
+// AuthSession's comment for what that used to cost.
 @Composable
 fun LoginScreen(authSession: AuthSession) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val controller = remember { LoginController() }
-    var isSigningIn by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val signInState by authSession.signInState.collectAsState()
+    val isSigningIn = signInState is AuthSession.SignInState.InProgress
 
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -40,23 +39,8 @@ fun LoginScreen(authSession: AuthSession) {
 
         Button(
             onClick = {
-                scope.launch {
-                    isSigningIn = true
-                    errorMessage = null
-                    try {
-                        val token = controller.signIn { uri ->
-                            CustomTabsIntent.Builder().build().launchUrl(context, uri)
-                        }
-                        authSession.signIn(token)
-                    } catch (e: AuthException.Cancelled) {
-                        errorMessage = "Sign-in was cancelled."
-                    } catch (e: CancellationException) {
-                        throw e // Composable left composition mid-sign-in — propagate, don't swallow.
-                    } catch (e: Exception) {
-                        errorMessage = e.message ?: "Sign-in failed."
-                    } finally {
-                        isSigningIn = false
-                    }
+                authSession.beginSignIn { uri ->
+                    CustomTabsIntent.Builder().build().launchUrl(context, uri)
                 }
             },
             enabled = !isSigningIn,
@@ -68,8 +52,8 @@ fun LoginScreen(authSession: AuthSession) {
             }
         }
 
-        errorMessage?.let { message ->
-            Text(message, color = Color.Red, style = MaterialTheme.typography.bodySmall)
+        (signInState as? AuthSession.SignInState.Failed)?.let { failed ->
+            Text(failed.message, color = Color.Red, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

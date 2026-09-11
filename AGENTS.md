@@ -31,8 +31,9 @@ is worth not repeating here), and a header stats row backed by
 `auth/AuthRedirect.kt`) matches the backend's real mobile-auth contract
 (code-exchange via Custom Tabs, not `sparklet-ios`'s
 `ASWebAuthenticationSession` callback shape — Custom Tabs has no direct
-callback, so the redirect is bridged back via `AuthRedirect`'s
-`onNewIntent`/`onResume` handling instead), confirmed live against
+callback, so the redirect arrives as a fresh Intent and is handled at process
+scope by `AuthSession`; `auth/AuthRedirect.kt`, which used to bridge it into
+a screen-scoped coroutine, was removed 2026-09-11, see decision 6), confirmed live against
 `sparklet`'s `main` (commit `89be8be`) and with `sparklet-android` already
 in `ALLOWED_MOBILE_SCHEMES` while scaffolding this. (Quiz/guess/
 misconception/review answering was listed here as not yet built; it was
@@ -142,9 +143,8 @@ UI that matches them rather than fights them:
   here, matching `ASWebAuthenticationSession` on iOS), and the raw session
   cookie that flow produces can't cross into a native app anyway (unlike
   `ASWebAuthenticationSession`, Custom Tabs has no direct completion
-  callback — the redirect arrives as a separate Intent, bridged back to the
-  in-flight sign-in via `AuthRedirect`'s `onNewIntent`/`onResume` handling;
-  see `auth/AuthRedirect.kt`). The
+  callback — the redirect arrives as a separate Intent, handled at process
+  scope by `AuthSession`; see decision 6). The
   backend uses a short-lived one-time-code handoff (RFC 8252-style), not a
   token embedded directly in a redirect — a token in a URL sits in browser
   history/OS logs and goes to whatever app the OS resolves a custom scheme
@@ -236,6 +236,33 @@ UI that matches them rather than fights them:
    the client looks healthy while earning zero XP. When adding a request
    model, check the route's zod schema for which fields are required and
    whether optionals tolerate null.
+
+6. **Sign-in is orchestrated at process scope, not screen scope
+   (2026-09-11).** `AuthSession` owns the whole flow and
+   `auth/AuthRedirect.kt` is gone. Do not move this back into the UI layer.
+   The flow necessarily leaves the app for a Custom Tab, so by the time the
+   one-time code arrives as a fresh Intent, the Activity and its composition
+   may both have been destroyed. The previous design bridged the redirect
+   into a suspend function running in `LoginScreen`'s
+   `rememberCoroutineScope` through a `MutableSharedFlow` with `replay = 0`,
+   which silently dropped the code whenever nothing was subscribed:
+
+   - **Activity recreation mid-sign-in** — any configuration change, and on a
+     foldable that includes simply folding or unfolding while the tab is
+     open. The composition is torn down, its scope is cancelled, and the
+     emission reaches zero subscribers.
+   - **Process death while backgrounded in the browser** — the redirect
+     restarts the app, but no coroutine is waiting.
+
+   Both burn a single-use 60-second code and drop the user back on the login
+   screen with no error. `AuthSession.onAuthRedirect` therefore redeems any
+   code that arrives *without* requiring that a sign-in was started in this
+   process, and runs the exchange in its own application-lifetime scope.
+   Verified by cold-starting the app straight from a
+   `sparklet-android://auth?code=…` Intent with no sign-in in flight: the
+   exchange is attempted and its result surfaces. `LoginScreen` holds no
+   sign-in state and starts no coroutine — it renders
+   `AuthSession.signInState`.
 
 ## Commands
 
