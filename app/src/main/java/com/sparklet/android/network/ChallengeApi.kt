@@ -18,7 +18,7 @@ private data class MisconceptionAnswerRequest(val guess: Boolean, val tzOffsetMi
 // Exactly one of text/skip is sent; the unused one is omitted on the wire
 // (ApiClient's explicitNulls = false), matching the route's zod union.
 @Serializable
-private data class ExplainAnswerRequest(
+internal data class ExplainAnswerRequest(
     val text: String? = null,
     val skip: Boolean? = null,
     val tzOffsetMinutes: Int,

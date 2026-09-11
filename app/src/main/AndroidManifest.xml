@@ -29,6 +29,24 @@
             </intent-filter>
 
             <!--
+            Invite links: https://sparkletapp.com/invite/<refId>, mirroring the
+            Universal Link sparklet-ios handles. autoVerify only takes effect
+            once an assetlinks.json naming this package is served from
+            /.well-known/ on that domain; until then Android treats this as an
+            ordinary web intent and may offer a chooser rather than opening
+            the app directly. See MainActivity.handleInviteLink.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="sparkletapp.com"
+                    android:pathPrefix="/invite/" />
+            </intent-filter>
+
+            <!--
             Backend's /api/auth/mobile-complete redirects here once sign-in
             completes: sparklet-android://auth?code=<code>. The scheme must
             exactly match an entry in ALLOWED_MOBILE_SCHEMES

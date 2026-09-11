@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
 // it, and a default here is exactly what made it vanish from the wire once
 // (see ApiClient.json). Passing it explicitly at the call site keeps the
 // requirement visible rather than resting on serializer configuration.
-private data class InteractionRequest(
+internal data class InteractionRequest(
     val cardId: String,
     val action: String,
     val tzOffsetMinutes: Int,
