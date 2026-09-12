@@ -8,6 +8,16 @@ Android client only.
 
 ## Status
 
+**Updated 2026-09-12: the iOS port is feature-complete except ads and
+billing** (decision 7), and was exercised end-to-end on a physical device —
+leaderboard, notifications, profile, friends, knowledge map, feed settings and
+topic filtering, card actions, card detail, depth switching, explain-back,
+recap slides, the invite deep link and sign-out. README's "Needs on-device
+verification" lists the two things still untested (onboarding and the friends
+request lifecycle, both needing a second account) and what that test pass
+found. `MISTAKES.md` records why two of those features were broken when first
+run.
+
 **Updated 2026-09-11: builds and runs on a physical device** (Galaxy Z Flip 7,
 `SM-F766B`, Android 16) from a command-line `./gradlew :app:assembleDebug` —
 a Gradle wrapper is now committed, so no local Gradle install is needed. The

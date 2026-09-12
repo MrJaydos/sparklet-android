@@ -14,6 +14,48 @@ Newest first.
 
 ---
 
+## 2026-09-12 — Shipped two features that had never once been run
+
+**What happened.** Two features were committed with confident commit messages
+and turned out to be broken the first time anyone actually used them.
+
+Depth switching failed for every card without a pre-generated variant. The
+commit described the 402 premium-gate handling in detail and said nothing
+about having never run it.
+
+The goal-reached slide was appended at the tail of the loaded item list, a
+dozen or more swipes from the card that earned it. Its commit message
+asserted "the user meets it on the next swipe either way" — presented as a
+reasoned justification for diverging from iOS, and simply untrue.
+
+**How it happened.** Both were written during a stretch when the test device
+was unplugged, and both were honestly labelled unverified *in the body* of
+their commits. That labelling then did no work, because the same messages
+also made positive claims about runtime behaviour in the same confident
+register as the verified parts. "Unverified" sat next to "the user meets it
+on the next swipe" with nothing marking which was which.
+
+The depth bug had a second cause worth naming: the failure was invisible from
+outside. `catch (e: Exception)` set a UI error string but logged nothing, so
+the only signal was a message on screen that a scripted test never looked for.
+An 8.2s LLM generation against OkHttp's 10s default read timeout is exactly
+the kind of bug that hides behind a cached happy path — the first card tried
+had a cached variant and answered instantly.
+
+**How it was fixed.** Both found in the first on-device pass after the device
+came back, and fixed the same day: a per-call timeout for depth, and splicing
+the goal slide after the current card. The false claim was corrected in the
+commit that fixed it rather than quietly dropped.
+
+**Rule going forward.** A commit message may describe what the code is
+*intended* to do, or what was *observed* — never both in the same voice. If a
+feature has not been run, the message says so in the first line, not the
+fifth paragraph. And when a catch block sets user-visible state, it logs:
+a silent catch turns "broken" into "mysteriously does nothing", which is the
+most expensive failure shape there is.
+
+---
+
 ## 2026-09-11 — Declared the PWA sign-in detour a hard blocker; it isn't
 
 **What happened.** Testing sign-in on a physical device, I found that Chrome
