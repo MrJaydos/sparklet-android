@@ -278,14 +278,20 @@ UI that matches them rather than fights them:
    are the only two `sparklet-ios` surfaces not ported, and neither is a
    porting job:
 
-   - **Billing.** The backend has `/api/billing/apple/verify` plus Stripe
-     (`checkout`/`portal`/`webhook`) and **no Google Play route at all** —
-     grep for `androidpublisher` in the `sparklet` repo and you get nothing.
-     Android can't verify a purchase against a backend that has no endpoint
-     to verify it with, so this needs a `/api/billing/google/verify` that
-     validates a Play purchase token via the Play Developer API, plus Play
-     Console products and a service account. Server work first, client
-     second. Do not ship a client-trusted "premium = true" in the meantime.
+   - **Billing. Server side now exists (2026-09-12), client side doesn't.**
+     The backend gained `/api/billing/google/verify` and
+     `/api/billing/google/notifications` plus `src/lib/google-play.ts`, so
+     the original blocker — no endpoint to verify a purchase against — is
+     gone. What remains is genuinely blocked on account setup nobody has done
+     yet: a Play Console record for `com.sparklet.android` with the app on at
+     least an internal testing track (Play Billing cannot be exercised from a
+     sideloaded debug build), subscription products, a service account with
+     Play Developer API access wired up as
+     `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`, and a Pub/Sub topic for RTDN. The
+     backend's own `AGENTS.md` has the full list. Until those exist
+     `isGooglePlayBillingEnabled()` is false and the verify route answers 503,
+     so adding a Play Billing client now would have nothing to talk to. Do
+     not ship a client-trusted "premium = true" in the meantime.
    - **Ads.** iOS uses Google Mobile Ads with UMP consent and ATT. The
      Android equivalent needs its own AdMob app ID and ad unit IDs (they are
      per-platform, so the iOS ones can't be reused) and a UMP consent flow —
