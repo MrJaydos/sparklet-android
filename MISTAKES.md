@@ -14,6 +14,38 @@ Newest first.
 
 ---
 
+## 2026-09-12 — Put sign-out where nobody could find it
+
+**What happened.** I built the app's first sign-out UI and placed it at the
+end of the Profile sheet's `LazyColumn` — after badges, top topics, notebook,
+and the full History list. The user's report was "there's no way to sign out
+that I can tell".
+
+**How it happened.** I verified it by *reaching* it, not by *finding* it. My
+own test swiped to the bottom of Profile eight times to tap it, and I recorded
+that as "sign out verified" — the feature worked perfectly, which is exactly
+what made the placement problem invisible to me. A scripted test that knows
+where a control is can never discover that a human wouldn't.
+
+The placement itself came from treating the profile as a document with
+sign-out as a footer. History is unbounded — it grows with every card ever
+read — so "the bottom of Profile" is not a location, it's a distance that
+increases the longer someone uses the app.
+
+**How it was fixed.** Moved to the top-right of the Profile sheet, visible
+without scrolling, with a confirmation dialog added because a now-prominent
+control that costs a full Custom Tab round trip to undo should not fire on one
+stray tap. Note there was no iOS precedent to copy here — `sparklet-ios` has
+no sign-out UI at all ("no UI for one yet" in its `AuthSession.swift`).
+
+**Rule going forward.** Verifying that a control *works* is not verifying that
+it is *reachable*. When a test has to scroll to find something, that scrolling
+is a finding, not a test step — ask whether a user who didn't already know it
+was there would ever get to it. Never place an action after a list with no
+upper bound.
+
+---
+
 ## 2026-09-12 — Shipped two features that had never once been run
 
 **What happened.** Two features were committed with confident commit messages

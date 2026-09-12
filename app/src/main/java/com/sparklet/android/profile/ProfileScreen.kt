@@ -14,13 +14,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,6 +65,8 @@ fun ProfileScreen(viewModel: ProfileViewModel) {
 
 @Composable
 private fun ProfileContent(details: ProfileDetailsResponse, onSignOut: () -> Unit) {
+    var confirmingSignOut by remember { mutableStateOf(false) }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -78,16 +85,34 @@ private fun ProfileContent(details: ProfileDetailsResponse, onSignOut: () -> Uni
                         color = SparkletColors.TextMuted,
                     )
                 }
-                if (details.premium) {
+                Column(horizontalAlignment = Alignment.End) {
+                    if (details.premium) {
+                        Text(
+                            "PREMIUM",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = SparkletColors.AccentText,
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .border(1.dp, SparkletColors.Border, CircleShape)
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                        )
+                    }
+                    // Up here, not at the end of the list: History is
+                    // unbounded, so a sign-out below it sat behind ~8 swipes
+                    // and was reported as "no way to sign out that I can
+                    // tell". Anything a user needs to find on purpose cannot
+                    // live past an infinite list.
                     Text(
-                        "PREMIUM",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = SparkletColors.AccentText,
+                        "Sign out",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = SparkletColors.DangerText,
                         modifier = Modifier
-                            .clip(CircleShape)
-                            .border(1.dp, SparkletColors.Border, CircleShape)
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                            .padding(top = if (details.premium) 8.dp else 0.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(1.dp, SparkletColors.Border, RoundedCornerShape(8.dp))
+                            .clickable { confirmingSignOut = true }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
                     )
                 }
             }
@@ -165,19 +190,36 @@ private fun ProfileContent(details: ProfileDetailsResponse, onSignOut: () -> Uni
             }
         }
 
-        item {
-            Text(
-                "Sign out",
-                style = MaterialTheme.typography.bodyMedium,
-                color = SparkletColors.DangerText,
-                modifier = Modifier
-                    .padding(top = 16.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .border(1.dp, SparkletColors.Border, RoundedCornerShape(12.dp))
-                    .clickable(onClick = onSignOut)
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-            )
-        }
+    }
+
+    // Prominent placement plus a one-tap confirm: signing back in means the
+    // whole Custom Tab round trip (and, with the PWA installed, a detour
+    // through it), so an accidental tap is expensive to undo.
+    if (confirmingSignOut) {
+        AlertDialog(
+            onDismissRequest = { confirmingSignOut = false },
+            containerColor = SparkletColors.Panel,
+            title = { Text("Sign out?", color = SparkletColors.TextPrimary) },
+            text = {
+                Text(
+                    "You'll need to sign in again to get back to your feed.",
+                    color = SparkletColors.TextTertiary,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmingSignOut = false
+                    onSignOut()
+                }) {
+                    Text("Sign out", color = SparkletColors.DangerText)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingSignOut = false }) {
+                    Text("Cancel", color = SparkletColors.TextTertiary)
+                }
+            },
+        )
     }
 }
 
